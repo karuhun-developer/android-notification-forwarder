@@ -1,232 +1,113 @@
-﻿# 📡 Notification Interceptor
+# Notification Interceptor / Android Notification Forwarder
 
-> An Android app that listens to every notification on your device and forwards matching ones to user-defined API endpoints — powered by Room, OkHttp, and Jetpack Compose.
+Aplikasi Android generik yang meneruskan notifikasi sesuai package/rule ke endpoint HTTP. Versi kerja ini menambahkan antrean Room, WorkManager, identitas event/delivery, retry opt-in, dan riwayat delivery untuk kebutuhan seperti QRIS soundbox.
 
----
+Listener meneruskan isi notifikasi; konfirmasi pembayaran, parser merchant, dashboard, dan audio dikerjakan oleh receiver terpisah. Rancangan soundbox tersedia pada workspace lokal terpisah di `../qris-soundbox/readme.md`.
 
-## Demo
+## Fitur yang sudah dibuat
 
-![alt text](demo.gif)
+- Routing berdasarkan package aplikasi, endpoint, method, dan custom headers.
+- Snapshot delivery disimpan sebelum HTTP: payload, endpoint, headers, dan setting retry tetap untuk delivery tersebut.
+- WorkManager dengan network constraint, backoff, recovery saat app dibuka/listener connect, dan recovery periodik.
+- Identitas tetap untuk replay/retry, claim atomik, lease, dan completion yang memeriksa token pemilik.
+- Retry otomatis default mati; dapat diaktifkan per rule untuk notifikasi berikutnya.
+- History menampilkan state, attempts, HTTP/error, serta retry manual pada FAILED. History lama ditampilkan terpisah.
+- Catch-up notifikasi yang masih aktif saat reconnect serta request rebind.
+- Migrasi Room v1/v2 ke v3 mempertahankan rule/history; tidak memakai destructive fallback.
+- [GitHub Actions](.github/workflows/android-release.yml) untuk tes, lint, build, dan GitHub Release ketika tag versi dipush.
 
-## Webhook Result Example
+## Build dan install
 
-![alt text](image.png)
-
-## ✨ Features
-
-- 🔔 **Real-time interception** — listens to all device notifications via `NotificationListenerService`
-- 📋 **Rule-based routing** — match notifications by package name and forward them to different API endpoints
-- 🌐 **Flexible API calls** — supports `POST`, `GET`, `PUT`, `PATCH`, and `DELETE` with custom headers
-- 💾 **Persistent rules** — rules saved locally with Room database (survives app restarts)
-- 🧪 **Built-in test tool** — send a dummy notification to validate your rules without a real app
-- 🎨 **Premium dark UI** — built with Jetpack Compose + Material 3
-
----
-
-## 🏗️ Architecture
-
-```
-com.karuhundeveloper.notification/
-│
-├── data/
-│   ├── local/
-│   │   ├── entity/          InterceptRule.kt        ← Room @Entity
-│   │   ├── dao/             InterceptRuleDao.kt     ← CRUD + Flow
-│   │   ├── converter/       Converters.kt           ← List/Map TypeConverters
-│   │   └──                  AppDatabase.kt          ← Room singleton
-│   └── model/
-│       └──                  NotificationPayload.kt  ← API request body
-│
-├── network/
-│   ├──                      NotificationPusher.kt   ← OkHttp call builder
-│   └──                      PushResult.kt           ← Sealed result type
-│
-├── service/
-│   └──                      AppNotificationListener.kt ← NotificationListenerService
-│
-└── ui/
-    ├── theme/               Theme.kt                ← Material3 dark theme
-    ├── component/           MethodBadge.kt          ← Shared composables
-    ├── screen/
-    │   ├──                  MainScreen.kt           ← Rules list
-    │   └──                  AddRuleScreen.kt        ← Add/create rule form
-    ├── viewmodel/           RulesViewModel.kt       ← AndroidViewModel
-    └──                      MainActivity.kt         ← NavHost entry point
-```
-
----
-
-## 🛠️ Tech Stack
-
-| Layer      | Library                      | Version          |
-| ---------- | ---------------------------- | ---------------- |
-| UI         | Jetpack Compose + Material 3 | BOM `2024.09.00` |
-| Navigation | Navigation Compose           | `2.8.1`          |
-| ViewModel  | Lifecycle ViewModel Compose  | `2.8.6`          |
-| Database   | Room                         | `2.6.1`          |
-| Networking | OkHttp                       | `4.12.0`         |
-| JSON       | Gson                         | `2.10.1`         |
-| Min SDK    | 24 (Android 7.0)             |                  |
-| Target SDK | 36                           |                  |
-| Language   | Kotlin `2.0.21` + KSP        |                  |
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Android Studio Hedgehog (2023.1.1) or newer
-- JDK 11
-- Android device or emulator running API 24+
-
-### Build & Run
+Gunakan JDK 21, Android SDK Platform 36.1, Build Tools 36.0.0, serta Gradle wrapper repo. Compile SDK 36.1, target SDK 36, minimum Android API 24. Target bytecode Java 11 tidak berarti build cukup memakai JDK 11. Validasi lokal menggunakan JDK 21; hasil dan batas environment ada di [laporan reliabilitas](docs/reliability.md).
 
 ```bash
-# Clone the repo
-git clone https://github.com/your-username/NotificationInterceptor.git
-cd NotificationInterceptor
-
-# Open in Android Studio and let Gradle sync, or build from CLI:
-./gradlew assembleDebug
-
-# Install on connected device
-./gradlew installDebug
+git clone https://github.com/karuhun-developer/android-notification-forwarder.git
+cd android-notification-forwarder
+bash gradlew :app:assembleDebug
+bash gradlew :app:installDebug
 ```
 
----
+Set `ANDROID_HOME` ke SDK lokal atau konfigurasi `sdk.dir` di `local.properties`. APK debug ada di `app/build/outputs/apk/debug/app-debug.apk`. `assembleRelease` menghasilkan APK unsigned karena keystore produksi belum dikonfigurasi.
 
-## 🔐 Permissions Setup
+## Setup listener dan rule
 
-The app requires two special permissions that must be granted **manually** by the user.
+1. Buka aplikasi dan beri **Notification access** dari Settings. Akses yang diberikan dan status service connected adalah kondisi berbeda; periksa indikator aplikasi.
+2. Pilih package aplikasi yang menerbitkan notifikasi penerimaan merchant. Jangan memilih aplikasi pembayar hanya karena wallet tersebut dipakai pelanggan.
+3. Buat rule dengan URL receiver, method, dan custom headers. Soundbox dirancang memakai POST HTTPS dengan token ingestion.
+4. Untuk dummy, tambahkan package `com.karuhundeveloper.notification`. Pada Android 13+ beri izin POST_NOTIFICATIONS lalu tekan **Send Dummy**. Izin ini untuk dummy, bukan pengganti Notification access.
+5. Buka History rule untuk memeriksa delivery dan respons endpoint. HTTP 2xx hanya menyatakan endpoint menerima request.
 
-### 1. Notification Listener Access _(required for interception)_
+Contoh custom headers untuk receiver yang menerima token:
 
-The app will show a red warning banner on the main screen if this is not granted.
+```json
+{ "Authorization": "Bearer <device-ingestion-token>" }
+```
 
-1. Tap the **Grant** button in the banner, or go to:
-   **Settings → Apps → Special app access → Notification access**
-2. Find **Notification Interceptor** and toggle it **ON**
-3. Return to the app — the banner disappears automatically
+Endpoint `/api/v1/notifications` dalam dokumen soundbox masih rancangan; tidak disediakan oleh repo Android ini. Belum ada parser merchant DANA/OVO/ShopeePay yang terverifikasi.
 
-### 2. Post Notifications _(required for the dummy test button)_
+## Kontrak request
 
-On Android 13+ (API 33), the app will prompt for this permission the first time you tap **Send Dummy**.
-
----
-
-## 📖 How to Use
-
-### Creating a Rule
-
-1. Tap **＋ Add Rule** on the main screen
-2. Fill in the fields:
-
-   | Field          | Example                                | Notes                                         |
-   | -------------- | -------------------------------------- | --------------------------------------------- |
-   | Rule Name      | `WhatsApp → Slack`                     | Human-readable label                          |
-   | Target Apps    | `com.whatsapp, com.telegram.messenger` | Comma-separated package names                 |
-   | API URL        | `https://hooks.slack.com/services/…`   | Must start with `http://` or `https://`       |
-   | HTTP Method    | `POST`                                 | Choose from GET / POST / PUT / PATCH / DELETE |
-   | Custom Headers | `{"Authorization": "Bearer xyz"}`      | Optional flat JSON object                     |
-
-3. Tap **Save** — the rule appears in the list immediately
-
-### Testing the Pipeline
-
-1. Create a rule with **Target Apps** set to this app's own package name:
-   `com.karuhundeveloper.notification`
-2. Tap **Send Dummy** on the main screen
-3. The service intercepts the notification and calls your API
-4. Check Logcat (tag: `AppNotificationListener`) to see the push result
-
----
-
-## 🌐 API Payload
-
-Every matched notification is forwarded as a JSON body:
+POST, PUT, dan PATCH memakai body JSON dengan empat field lama:
 
 ```json
 {
-  "app_name": "WhatsApp",
-  "notification_title": "John Doe",
-  "notification_text": "Hey, are you free tonight?",
-  "timestamp_ms": 1720432800000
+  "app_name": "Merchant App",
+  "notification_title": "<judul asli>",
+  "notification_text": "<teks asli>",
+  "timestamp_ms": 1791939600000
 }
 ```
 
-For **GET** requests, the same fields are sent as URL query parameters instead of a body.  
-Custom headers from the rule (e.g. `Authorization`, `X-Source`) are attached to every request.
+GET mengirim field yang sama sebagai query parameters; DELETE tidak mengirim body. Custom headers tetap dilampirkan. Delivery dari antrean menambahkan:
 
----
+| Header | Nilai |
+| --- | --- |
+| `X-Notification-Event-Id` | SHA-256 installation UUID, notification key, post time, title, text |
+| `X-Delivery-Id` | UUID satu delivery ke satu rule |
+| `X-Notification-Package` | Package sumber Android |
 
-## 🧩 Data Model
+Header internal dipasang setelah custom headers agar tidak tertimpa. Unique event + rule mencegah replay notifikasi identik membuat delivery lain. Perubahan judul/teks/post time dapat membentuk event baru; event ID ini bukan referensi transaksi provider.
 
-```kotlin
-@Entity(tableName = "intercept_rules")
-data class InterceptRule(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val ruleName: String,
-    val targetApps: List<String>,           // stored as JSON array
-    val apiUrl: String,
-    val apiMethod: String,                  // "POST", "GET", etc.
-    val customHeaders: Map<String, String>  // stored as JSON object
-)
+`timestamp_ms` adalah waktu capture pertama yang tersimpan untuk delivery. Android post time disimpan lokal tetapi tidak dikirim. Notifikasi lama yang masih aktif saat reconnect dapat memiliki capture timestamp baru; receiver tidak boleh menganggap timestamp ini bukti waktu terjadinya pembayaran.
+
+## Antrean dan retry
+
+| State | Arti |
+| --- | --- |
+| QUEUED | Sudah tersimpan, menunggu work/jaringan |
+| SENDING | Sedang dimiliki worker melalui lease |
+| RETRYING | Menunggu attempt berikutnya |
+| DELIVERED | Endpoint mengembalikan HTTP 2xx |
+| FAILED | Memerlukan pemeriksaan/manual retry |
+| CANCELLED | Rule dihapus; delivery dihentikan |
+
+Auto-retry **default mati**, termasuk rule hasil migrasi. Jika diaktifkan, network error dan HTTP 408/429/5xx dapat dicoba ulang sampai 10 attempts per siklus. Error konfigurasi, redirect, dan permanent 4xx berhenti. Backoff WorkManager eksponensial mulai 30 detik; scheduler Android dapat menundanya.
+
+Client bawaan mematikan redirect serta retry koneksi implisit dan mencegah follow-up otomatis HTTP 503 dengan `Retry-After: 0`. Setiap attempt ditangani kebijakan delivery. Lease 120 detik dan total call timeout 45 detik. Client custom yang diinject perlu mempertahankan kebijakan yang sama.
+
+Request yang terputus bisa sudah diterima receiver. Aktifkan retry hanya setelah receiver menyimpan event sebelum ACK serta mendeduplikasi identitas delivery. Retry manual mengantrekan ulang FAILED dengan ID/body tetap, mereset attempts, dan mempertahankan endpoint/settings snapshot. Klik stale tidak membatalkan work yang sudah antre.
+
+Jika worker terputus saat SENDING, lease expired dipulihkan sebagai retry hanya bila opt-in dan budget tersedia. Selain itu hasil menjadi FAILED dengan outcome unknown. Periksa receiver sebelum retry manual. Menghapus rule menghentikan antrean tetapi tidak menarik request yang sudah diterima server.
+
+## Data dan batas pemulihan
+
+Antrean mulai tahan restart setelah commit Room berhasil. Process death sebelum commit, notifikasi yang tidak pernah terbit, notifikasi yang hilang saat listener mati, force-stop, dan pembatasan OEM tetap bisa menyebabkan kehilangan capture. Catch-up hanya membaca notifikasi yang masih outstanding, bukan riwayat transaksi.
+
+Listener tidak berjalan sebelum unlock setelah reboot. WorkManager recovery periodik minimum 15 menit dan jadwalnya tidak exact. Belum ada QA perangkat untuk reboot, reconnect, Doze/OEM, maupun visual/font besar. Pengiriman maupun bunyi tepat satu kali tidak dijanjikan.
+
+Clear history hanya menghapus history lama. Delivery dipertahankan untuk dedup; purge aman belum dibuat. Database dan installation identity dikecualikan dari backup/cloud/device transfer. Rules/history/queue tidak dipulihkan lewat backup; reinstall atau clear data menghilangkannya. Headers/token disimpan dalam database app lokal.
+
+## Tes dan release
+
+```bash
+bash gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease
 ```
 
----
+Suite menggunakan Room, Robolectric, WorkManager test API, dan MockWebServer. [Laporan reliabilitas](docs/reliability.md) mencatat hasil aktual, regression sebelum/sesudah fix, serta keterbatasan emulasi host ARM. Full suite belum dinyatakan lulus lokal.
 
-## 📡 Push Result Handling
+Tag seperti `v1.0.0` atau `v1.1.0-beta.1` memicu workflow. Build harus lulus tes/lint sebelum APK dan checksum dipublikasikan. Detail trigger, artifacts, signing, dan cara menjalankan ada di [panduan CI/release](docs/ci-release.md).
 
-`NotificationPusher.push()` returns a sealed `PushResult` — no exceptions propagate to the caller:
-
-```kotlin
-when (result) {
-    is PushResult.Success           -> // HTTP 2xx  ✅
-    is PushResult.HttpError         -> // HTTP 4xx / 5xx  ⚠️
-    is PushResult.NetworkError      -> // No connectivity / timeout  ❌
-    is PushResult.UnsupportedMethod -> // Unknown HTTP method  ❌
-}
-```
-
----
-
-## 📝 Logcat
-
-Filter in Android Studio by tag to see real-time pipeline activity:
-
-```
-tag:AppNotificationListener
-```
-
-| Emoji | Meaning                                    |
-| ----- | ------------------------------------------ |
-| ✅    | Notification successfully delivered to API |
-| ⚠️    | Server returned a non-2xx status           |
-| ❌    | Network failure or unsupported method      |
-
----
-
-## 🗺️ Roadmap
-
-- [ ] Rule enable/disable toggle
-- [ ] Edit existing rules
-- [ ] Per-rule push history and success rate counter
-- [ ] Retry with exponential backoff
-- [ ] Hilt dependency injection
-- [ ] Rule import / export (JSON file)
-- [ ] Filter by notification title / body keyword (regex support)
-- [ ] Webhook test ping from rule card
-
----
-
-## 🤝 Contributing
-
-Pull requests are welcome! For major changes, please open an issue first to discuss what you'd like to change.
-
----
-
-## 📄 License
+## License
 
 ```
 MIT License — Copyright (c) 2026 karuhundeveloper
