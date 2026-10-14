@@ -21,6 +21,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.SQLiteMode
+import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
@@ -36,14 +37,14 @@ class DeliveryIntegrationTest {
     @Before fun setup() {
         context.deleteDatabase(databaseName)
         db = openDatabase()
-        server = MockWebServer().also { it.start() }
+        server = MockWebServer().also { it.start(InetAddress.getByName("127.0.0.1"), 0) }
     }
     @After fun teardown() { db.close(); server.shutdown(); context.deleteDatabase(databaseName) }
     private fun openDatabase() = Room.databaseBuilder(context, AppDatabase::class.java, databaseName).build()
     private fun engine() = DeliveryEngine(db.notificationDeliveryDao(), NotificationPusher()) { now }
     private suspend fun addRule(autoRetry: Boolean = false): InterceptRule {
         val rule = InterceptRule(ruleName = "merchant", targetApps = listOf("merchant.app"),
-            apiUrl = server.url("/notifications").toString(), apiMethod = "POST",
+            apiUrl = server.url("/notifications").newBuilder().host("127.0.0.1").build().toString(), apiMethod = "POST",
             customHeaders = mapOf("Authorization" to "Bearer device-test", "X-Delivery-Id" to "spoofed"),
             autoRetry = autoRetry)
         return rule.copy(id = db.interceptRuleDao().insertRule(rule).toInt())
