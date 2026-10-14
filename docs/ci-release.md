@@ -13,6 +13,14 @@ git push origin v1.2.0
 
 Gunakan nomor versi baru pada release berikutnya. Buka tab Actions untuk log dan artifacts; setelah job publish berhasil, unduh APK dari GitHub Releases. Tag dengan suffix seperti `-beta.1` menghasilkan prerelease.
 
+Jika run otomatis belum muncul atau perlu membangun ulang tag existing, gunakan **Run workflow** pada tab Actions dengan input `release_tag`, atau:
+
+```bash
+gh workflow run android-release.yml --ref master -f release_tag=v1.2.0
+```
+
+Run manual mengambil kode dari tag tersebut, memakai versi dan nama assets tag, serta menjalankan checks yang sama. Workflow pada branch `master` harus sudah memuat opsi manual ini. Trigger otomatis push tag tetap aktif.
+
 ## Pipeline
 
 1. Checkout commit tag, siapkan Temurin JDK 21, validasi Gradle wrapper, dan cache Gradle.
