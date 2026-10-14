@@ -16,8 +16,8 @@ android {
         applicationId = "com.karuhundeveloper.notification"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = providers.gradleProperty("releaseVersionCode").map(String::toInt).getOrElse(1)
+        versionName = providers.gradleProperty("releaseVersionName").getOrElse("1.0")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
