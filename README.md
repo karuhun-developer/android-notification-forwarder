@@ -103,9 +103,11 @@ Clear history hanya menghapus history lama. Delivery dipertahankan untuk dedup; 
 bash gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease
 ```
 
-Suite menggunakan Room, Robolectric, WorkManager test API, dan MockWebServer. [Laporan reliabilitas](docs/reliability.md) mencatat hasil aktual, regression sebelum/sesudah fix, serta keterbatasan emulasi host ARM. Full suite belum dinyatakan lulus lokal.
+Suite menggunakan Room, Robolectric, WorkManager test API, dan MockWebServer. Full suite pada GitHub Actions untuk `v1.2.1` lulus: 24 tes, tanpa failure/error/skip; lint 0 error dan 37 warning. [Laporan reliabilitas](docs/reliability.md) mencatat bukti hosted dan hasil lokal dengan keterbatasan emulasi host ARM.
 
 Tag seperti `v1.0.0` atau `v1.1.0-beta.1` memicu workflow. Build harus lulus tes/lint sebelum APK dan checksum dipublikasikan. Detail trigger, artifacts, signing, dan cara menjalankan ada di [panduan CI/release](docs/ci-release.md).
+
+[Release v1.2.1](https://github.com/karuhun-developer/android-notification-forwarder/releases/tag/v1.2.1) menyediakan APK debug untuk pengujian, APK release unsigned, dan checksum SHA-256. Push tag ini berhasil memicu build dan publish otomatis.
 
 ## License
 

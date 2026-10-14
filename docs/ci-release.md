@@ -7,8 +7,8 @@ Workflow: [android-release.yml](../.github/workflows/android-release.yml). Trigg
 Simpan dan push perubahan repo Android terlebih dahulu. Dari commit yang ingin dirilis:
 
 ```bash
-git tag -a v1.2.0 -m "Release v1.2.0"
-git push origin v1.2.0
+git tag -a v1.2.2 -m "Release v1.2.2"
+git push origin v1.2.2
 ```
 
 Gunakan nomor versi baru pada release berikutnya. Buka tab Actions untuk log dan artifacts; setelah job publish berhasil, unduh APK dari GitHub Releases. Tag dengan suffix seperti `-beta.1` menghasilkan prerelease.
@@ -16,7 +16,7 @@ Gunakan nomor versi baru pada release berikutnya. Buka tab Actions untuk log dan
 Jika run otomatis belum muncul atau perlu membangun ulang tag existing, gunakan **Run workflow** pada tab Actions dengan input `release_tag`, atau:
 
 ```bash
-gh workflow run android-release.yml --ref master -f release_tag=v1.2.0
+gh workflow run android-release.yml --ref master -f release_tag=v1.2.1
 ```
 
 Run manual mengambil kode dari tag tersebut, memakai versi dan nama assets tag, serta menjalankan checks yang sama. Workflow pada branch `master` harus sudah memuat opsi manual ini. Trigger otomatis push tag tetap aktif.
@@ -35,8 +35,8 @@ Run manual mengambil kode dari tag tersebut, memakai versi dan nama assets tag, 
 
 | Asset | Penggunaan |
 | --- | --- |
-| `notification-forwarder-v1.0.0-debug.apk` | Bisa di-install untuk pengujian; ditandatangani debug key runner |
-| `notification-forwarder-v1.0.0-release-unsigned.apk` | Build release tanpa signature; perlu keystore sendiri sebelum install/distribusi |
+| `notification-forwarder-v1.2.1-debug.apk` | Bisa di-install untuk pengujian; ditandatangani debug key runner |
+| `notification-forwarder-v1.2.1-release-unsigned.apk` | Build release tanpa signature; perlu keystore sendiri sebelum install/distribusi |
 | `SHA256SUMS.txt` | Pemeriksaan integritas APK |
 
 Workflow ini tidak memerlukan keystore secret atau personal access token. Debug key runner tidak dijanjikan tetap antar-run; APK debug hasil tag berbeda dapat gagal update di atas instalasi dengan key berbeda. Uninstall menghilangkan rules/queue/identity app, jadi untuk update yang mempertahankan data gunakan signing key tetap saat distribusi resmi.
@@ -51,4 +51,6 @@ Artifact APK/checksum disimpan 30 hari; artifact laporan 14 hari. Assets yang be
 
 ## Validasi yang tersedia
 
-Workflow diperiksa dengan actionlint serta pemeriksaan shell/tag/publishing lokal. Build Android dan hasil suite lokal dicatat di [reliability.md](reliability.md). Eksekusi GitHub Actions dan publish remote pertama masih harus diamati setelah perubahan masuk repo dan tag dipush; pengecekan lokal tidak membuktikan job hosted sudah berhasil.
+Pada 14 Oktober 2026, push tag `v1.2.1` memicu [run 38521741596](https://github.com/karuhun-developer/android-notification-forwarder/actions/runs/38521741596) secara otomatis. Seluruh 24 tes lulus, lint 0 error/37 warning, kedua APK berhasil dibangun, dan job publish berhasil. [Release v1.2.1](https://github.com/karuhun-developer/android-notification-forwarder/releases/tag/v1.2.1) terbit sebagai release stabil dengan tiga assets. Checksum file yang diunduh cocok; APK debug lolos apksigner, kedua APK memiliki versionName `1.2.1` dan versionCode `3`.
+
+Percobaan manual `v1.2.0` sebelumnya menemukan SDK tools yang belum tersedia, lalu satu kegagalan fixture retry pada localhost dengan IPv4/IPv6. SDK tools kini disiapkan eksplisit dan fixture memakai alamat loopback yang sama dengan server. Tag `v1.2.0` dipertahankan; publishing-nya tertahan oleh tes. Hasil hosted dan keterbatasan lokal dicatat di [reliability.md](reliability.md).

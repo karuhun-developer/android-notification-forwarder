@@ -1,8 +1,8 @@
 # Laporan reliabilitas listener
 
-Tanggal: 14 Oktober 2026. Baseline: `master` pada `2ca77b4c6595f47c4899e6c724af65bfc6f903ba`. Laporan ini mencatat validasi lokal sebelum publikasi tag; build/test di bawah bukan hasil pembayaran nyata.
+Tanggal: 14 Oktober 2026. Baseline perubahan: `master` pada `2ca77b4c6595f47c4899e6c724af65bfc6f903ba`. Laporan ini mencatat validasi lokal sebelum tag serta hasil GitHub Actions untuk `v1.2.1`; build/test di bawah bukan hasil pembayaran nyata.
 
-## Hasil eksekusi
+## Hasil eksekusi lokal sebelum tag
 
 | Pemeriksaan | Hasil aktual |
 | --- | --- |
@@ -15,9 +15,27 @@ Tanggal: 14 Oktober 2026. Baseline: `master` pada `2ca77b4c6595f47c4899e6c724af6
 | Workflow GitHub | actionlint 1.7.12 dan syntax 6 shell steps lulus; smoke lokal tag/assets/publish lulus |
 | Android nyata / visual QA / audio / payment | Belum dijalankan; tidak ada perangkat atau emulator aktif |
 
-**Full suite belum lulus.** Sepuluh tes integrasi Room + HTTP gagal pada teardown server, tiga tes HTTP lainnya gagal di shutdown yang sama. Failure XML sesudah fix tidak melaporkan assertion aplikasi; ini merupakan bukti parsial dan tetap tidak dihitung sebagai test pass. Test dan teardown tidak dihapus, dilemahkan, atau ditelan error-nya.
+**Full suite lokal melalui emulasi belum lulus.** Sepuluh tes integrasi Room + HTTP gagal pada teardown server, tiga tes HTTP lainnya gagal di shutdown yang sama. Failure XML sesudah fix tidak melaporkan assertion aplikasi; ini merupakan bukti parsial dan tetap tidak dihitung sebagai test pass. Test dan teardown tidak dihapus, dilemahkan, atau ditelan error-nya.
 
-Host Linux aarch64 menggunakan JDK 21.0.12.1. Robolectric/native dependencies untuk pengujian Room di host ini memerlukan fallback JVM x86. Full run memakai JDK 17.0.20.1 lewat qemu 10.2.1 dengan `jdk.net.usePlainSocketImpl=true`; probe `ServerSocket` yang terpisah dari aplikasi juga tidak dapat menghentikan accept thread saat socket ditutup dalam emulasi. Akar masalah emulasi belum dipastikan. Jalankan full suite di Linux x86 native; workflow tag memakai runner x86 dan tetap menolak publishing bila suite gagal.
+Host Linux aarch64 menggunakan JDK 21.0.12.1. Robolectric/native dependencies untuk pengujian Room di host ini memerlukan fallback JVM x86. Full run memakai JDK 17.0.20.1 lewat qemu 10.2.1 dengan `jdk.net.usePlainSocketImpl=true`; probe `ServerSocket` yang terpisah dari aplikasi juga tidak dapat menghentikan accept thread saat socket ditutup dalam emulasi. Akar masalah emulasi belum dipastikan. Hasil runner Linux x86 native dicatat berikutnya; workflow tetap menolak publishing bila suite gagal.
+
+## Hasil GitHub Actions dan release v1.2.1
+
+[Run 38521741596](https://github.com/karuhun-developer/android-notification-forwarder/actions/runs/38521741596) dipicu otomatis oleh push tag `v1.2.1`, checkout `13412e0c340be56319f417ba64f3756e2b0afb41`, pada Ubuntu 24.04 x86 dengan JDK 21. Build dan publish keduanya lulus.
+
+| Pemeriksaan hosted | Hasil aktual |
+| --- | --- |
+| Full `testDebugUnitTest` | 24 tes lulus, 0 failure, 0 error, 0 skip dari tujuh XML suite |
+| DeliveryIntegration / DatabaseMigration / DeliveryScheduler | 10 / 2 / 2 tes lulus |
+| NotificationPusher / EventIdentity / RetryPolicy / Example | 4 / 2 / 3 / 1 tes lulus |
+| `lintDebug` | 0 error, 37 warning |
+| `assembleDebug` dan `assembleRelease` | Kedua APK berhasil dibuat |
+| Publish | Release stabil, bukan draft; debug APK, unsigned APK, SHA256SUMS.txt tersedia |
+| Assets yang diunduh | Kedua checksum cocok; debug signature terverifikasi; versionName `1.2.1`, versionCode `3` |
+
+[Release v1.2.1](https://github.com/karuhun-developer/android-notification-forwarder/releases/tag/v1.2.1) terbit pada 14 Oktober 2026. XML tes dan laporan lint tersedia sebagai artifact `android-validation-v1.2.1` selama retention workflow. Hosted pass tidak mengubah hasil lokal emulasi atau menggantikan QA perangkat.
+
+Percobaan manual `v1.2.0` pada run `38520035766` gagal sebelum tes karena `sdkmanager` tidak tersedia; command-line tools kemudian disiapkan eksplisit. Run `38520275689` menjalankan 24 tes dengan satu failure: retry kedua setelah respons hilang masih `RETRYING`. Repro HTTP dengan DNS localhost `[127.0.0.1, ::1]` dan server IPv4 menunjukkan percobaan kedua menuju IPv6 yang tidak mendengar; URL IPv4 eksplisit menghasilkan HTTP 200 dengan dua request. Fixture integrasi kini mengikat server dan URL ke `127.0.0.1`. Seluruh assertion, jumlah request, payload/identity, retry policy, dan teardown dipertahankan. Tag `v1.2.0` tidak diubah dan publishing-nya tertahan.
 
 ## Perubahan yang diuji
 
@@ -42,7 +60,7 @@ Tidak ada incident produksi yang direproduksi. Ini hardening preventif dengan re
 
 ## Cakupan suite
 
-[DeliveryIntegrationTest](../app/src/test/java/com/karuhundeveloper/notification/delivery/DeliveryIntegrationTest.kt) memakai database Room yang nyata untuk reopen/dedup, request diterima dengan response hilang, retry opt-in/manual, permanent HTTP, invalid config, claim paralel/stale completion, expired lease/budget, penghapusan rule/history, dan cancellation setelah claim. Seluruh test integrasi masih memerlukan full pass dengan shutdown server yang berfungsi.
+[DeliveryIntegrationTest](../app/src/test/java/com/karuhundeveloper/notification/delivery/DeliveryIntegrationTest.kt) memakai database Room yang nyata untuk reopen/dedup, request diterima dengan response hilang, retry opt-in/manual, permanent HTTP, invalid config, claim paralel/stale completion, expired lease/budget, penghapusan rule/history, dan cancellation setelah claim. Kesepuluh tes integrasi lulus pada runner hosted native x86 untuk `v1.2.1`; hasil emulasi lokal tetap tercatat terpisah.
 
 [DeliverySchedulerTest](../app/src/test/java/com/karuhundeveloper/notification/delivery/DeliverySchedulerTest.kt) menggunakan WorkManager test initialization dan Room untuk stale retry serta recovery gap commit-to-schedule. Ini tidak mensimulasikan Doze/OEM, reboot, atau real network constraint transition.
 
@@ -96,7 +114,7 @@ Artifacts di `app/build` merupakan hasil lokal yang diabaikan git dan dapat tert
 
 [Workflow](../.github/workflows/android-release.yml) lolos actionlint dan `bash -n` untuk enam step shell. Tag `v1.2.3` dan `v1.2.3-beta.1` diterima; prefix salah, versi tidak lengkap, slash/path, dan string command substitution ditolak. Script packaging memakai APK yang benar-benar dibangun dan kedua checksum lolos pemeriksaan.
 
-Script publish dijalankan lokal dengan fungsi `gh` pengganti untuk mencatat argumen. Fresh release, rerun, serta prerelease menghasilkan urutan/flags yang diharapkan. Upload gagal dengan code 17 menghentikan script sebelum publish draft. Smoke ini menguji kontrol alur; tidak mengakses GitHub Release API. Hosted Actions/publishing belum dijalankan. Lihat [panduan CI](ci-release.md).
+Script publish dijalankan lokal dengan fungsi `gh` pengganti untuk mencatat argumen. Fresh release, rerun, serta prerelease menghasilkan urutan/flags yang diharapkan. Upload gagal dengan code 17 menghentikan script sebelum publish draft. Smoke ini menguji kontrol alur; tidak mengakses GitHub Release API. Build dan publishing hosted kemudian lulus pada run `38521741596` untuk `v1.2.1`, termasuk verifikasi checksum dan release yang bukan draft. Lihat [panduan CI](ci-release.md).
 
 ## Gate perangkat dan soundbox berikutnya
 
