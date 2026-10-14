@@ -23,7 +23,7 @@ Run manual mengambil kode dari tag tersebut, memakai versi dan nama assets tag, 
 
 ## Pipeline
 
-1. Checkout commit tag, siapkan Temurin JDK 21, validasi Gradle wrapper, dan cache Gradle.
+1. Checkout commit tag, siapkan Temurin JDK 21 dan Android command-line tools, validasi Gradle wrapper, dan cache Gradle.
 2. Pasang SDK Platform 36.1 serta Build Tools 36.0.0 pada runner Ubuntu 24.04 x86.
 3. Jalankan `lintDebug`, seluruh `testDebugUnitTest`, `assembleDebug`, dan `assembleRelease`. Kegagalan tes/lint/build menghentikan publishing.
 4. Kemas kedua APK, buat SHA-256, dan upload artifact build. Laporan tes/lint dicoba diupload juga ketika job gagal.
