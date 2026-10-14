@@ -4,6 +4,9 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.karuhundeveloper.notification.data.local.AppDatabase
+import com.karuhundeveloper.notification.data.local.entity.NotificationDelivery
+import com.karuhundeveloper.notification.delivery.DeliveryRepository
+import com.karuhundeveloper.notification.delivery.DeliveryScheduler
 import com.karuhundeveloper.notification.data.local.entity.InterceptHistory
 import com.karuhundeveloper.notification.data.local.entity.InterceptRule
 import kotlinx.coroutines.flow.Flow
@@ -40,11 +43,22 @@ class RulesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteRule(rule: InterceptRule) {
-        viewModelScope.launch { ruleDao.deleteRule(rule) }
+        viewModelScope.launch { DeliveryRepository(db).deleteRule(rule) }
+    }
+
+    fun setAutoRetry(ruleId: Int, enabled: Boolean) {
+        viewModelScope.launch { ruleDao.setAutoRetry(ruleId, enabled) }
     }
 
     fun getHistoryForRule(ruleId: Int): Flow<List<InterceptHistory>> {
         return historyDao.getHistoryForRule(ruleId)
+    }
+
+    fun getDeliveriesForRule(ruleId: Int): Flow<List<NotificationDelivery>> =
+        db.notificationDeliveryDao().observeForRule(ruleId)
+
+    fun retryDelivery(id: String) {
+        viewModelScope.launch { DeliveryScheduler(getApplication()).retryManually(id) }
     }
 
     fun clearHistoryForRule(ruleId: Int) {

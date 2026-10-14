@@ -92,6 +92,11 @@ fun isIgnoringBatteryOptimizations(context: Context): Boolean {
  * [AppNotificationListener] will receive it exactly like any real notification.
  */
 fun postDummyNotification(context: Context) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+        PackageManager.PERMISSION_GRANTED
+    ) return
+
     // Create channel (required API 26+, no-op on lower)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         val channel = NotificationChannel(

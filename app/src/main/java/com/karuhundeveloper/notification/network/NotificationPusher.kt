@@ -35,8 +35,8 @@ import java.util.concurrent.TimeUnit
  * Any other method string returns [PushResult.UnsupportedMethod].
  *
  * ### Error handling
- * All outcomes (including failures) are surfaced through [PushResult] so the caller never
- * needs to catch exceptions from this class directly.
+ * HTTP, network and configuration outcomes use [PushResult]. Coroutine cancellation and
+ * unexpected runtime failures propagate to the caller.
  *
  * @param client    Shared [OkHttpClient] instance. Pass in your app-level singleton to share
  *                  connection pools and thread pools across all pushes.
@@ -45,7 +45,7 @@ import java.util.concurrent.TimeUnit
  *                   Defaults to [Dispatchers.IO] and can be overridden in unit tests.
  */
 class NotificationPusher(
-    private val client: OkHttpClient = defaultClient(),
+    private val client: OkHttpClient = sharedClient,
     private val gson: Gson = Gson(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
@@ -58,15 +58,23 @@ class NotificationPusher(
      * @param rule    The [InterceptRule] that matched the incoming notification. Supplies the
      *                target URL, HTTP method, and any custom headers.
      * @param payload The [NotificationPayload] describing the intercepted notification.
-     * @return A [PushResult] — never throws.
+     * @return A [PushResult] for expected HTTP, network and configuration outcomes.
      */
     suspend fun push(
         rule: InterceptRule,
-        payload: NotificationPayload
+        payload: NotificationPayload,
+        eventId: String? = null,
+        deliveryId: String? = null,
+        packageName: String? = null
     ): PushResult = withContext(dispatcher) {
         try {
-            val request = buildRequest(rule, payload)
+            val baseRequest = buildRequest(rule, payload)
                 ?: return@withContext PushResult.UnsupportedMethod(rule.apiMethod)
+            val request = baseRequest.newBuilder().apply {
+                eventId?.let { header("X-Notification-Event-Id", it) }
+                deliveryId?.let { header("X-Delivery-Id", it) }
+                packageName?.let { header("X-Notification-Package", it) }
+            }.build()
 
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string() ?: ""
@@ -78,6 +86,8 @@ class NotificationPusher(
             }
         } catch (e: IOException) {
             PushResult.NetworkError(e)
+        } catch (e: IllegalArgumentException) {
+            PushResult.ConfigurationError(e.message ?: "Invalid request configuration")
         }
     }
 
@@ -146,6 +156,7 @@ class NotificationPusher(
 
     companion object {
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+        private val sharedClient by lazy { defaultClient() }
 
         /**
          * Sensible production defaults.
@@ -154,6 +165,15 @@ class NotificationPusher(
          * - [OkHttpClient] is heavyweight; create it **once** at app startup and reuse it.
          */
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
+            .addNetworkInterceptor { chain ->
+                val response = chain.proceed(chain.request())
+                if (response.code == 503) response.newBuilder().removeHeader("Retry-After").build()
+                else response
+            }
+            .retryOnConnectionFailure(false)
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .callTimeout(45, TimeUnit.SECONDS)
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)

@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.karuhundeveloper.notification.data.local.entity.NotificationDelivery
+import com.karuhundeveloper.notification.delivery.DeliveryState
 import com.karuhundeveloper.notification.data.local.entity.InterceptHistory
 import com.karuhundeveloper.notification.ui.theme.*
 import com.karuhundeveloper.notification.ui.viewmodel.RulesViewModel
@@ -38,6 +40,9 @@ fun HistoryScreen(
     onNavigateBack: () -> Unit,
     viewModel: RulesViewModel = viewModel()
 ) {
+    val deliveries by viewModel.getDeliveriesForRule(ruleId).collectAsStateWithLifecycle(initialValue = emptyList())
+    val rules by viewModel.rules.collectAsStateWithLifecycle()
+    val rule = rules.firstOrNull { it.id == ruleId }
     val history by viewModel.getHistoryForRule(ruleId).collectAsStateWithLifecycle(initialValue = emptyList())
 
     Scaffold(
@@ -58,7 +63,7 @@ fun HistoryScreen(
                 actions = {
                     if (history.isNotEmpty()) {
                         IconButton(onClick = { viewModel.clearHistoryForRule(ruleId) }) {
-                            Icon(Icons.Default.DeleteSweep, contentDescription = "Clear History", tint = ErrorRed)
+                            Icon(Icons.Default.DeleteSweep, contentDescription = "Clear legacy history", tint = ErrorRed)
                         }
                     }
                 },
@@ -66,20 +71,39 @@ fun HistoryScreen(
             )
         }
     ) { padding ->
-        if (history.isEmpty()) {
-            EmptyHistoryPlaceholder(modifier = Modifier.padding(padding))
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
-            ) {
-                items(history, key = { it.id }) { item ->
-                    HistoryItemCard(item)
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
+        ) {
+            rule?.let { current ->
+                item(key = "retry-setting") {
+                    Card(colors = CardDefaults.cardColors(containerColor = NavyCard)) {
+                        Column(Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Auto-retry future notifications", color = TextPrimary,
+                                    modifier = Modifier.weight(1f))
+                                Switch(checked = current.autoRetry,
+                                    onCheckedChange = { viewModel.setAutoRetry(ruleId, it) })
+                            }
+                            Text("Enable only when the receiver deduplicates X-Delivery-Id. Existing deliveries keep their captured setting.",
+                                color = TextSecondary, fontSize = 12.sp)
+                        }
+                    }
                 }
+            }
+            if (history.isEmpty() && deliveries.isEmpty()) {
+                item { EmptyHistoryPlaceholder(modifier = Modifier.height(240.dp)) }
+            }
+            if (deliveries.isNotEmpty()) {
+                item { Text("Deliveries", color = TextPrimary, fontWeight = FontWeight.Bold) }
+                items(deliveries, key = { "delivery:" + it.id }) { item ->
+                    DeliveryCard(item, onRetry = { viewModel.retryDelivery(item.id) })
+                }
+            }
+            if (history.isNotEmpty()) {
+                item { Text("Legacy history · clear removes these entries only", color = TextSecondary, fontSize = 12.sp) }
+                items(history, key = { "history:" + it.id }) { item -> HistoryItemCard(item) }
             }
         }
     }
@@ -157,7 +181,7 @@ private fun StatusDot(isSuccess: Boolean) {
 @Composable
 private fun EmptyHistoryPlaceholder(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -169,5 +193,33 @@ private fun EmptyHistoryPlaceholder(modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.height(16.dp))
         Text("No history for this rule", color = TextSecondary, fontSize = 14.sp)
+    }
+}
+
+@Composable
+private fun DeliveryCard(item: NotificationDelivery, onRetry: () -> Unit) {
+    val label = when (item.state) {
+        DeliveryState.QUEUED -> "Queued"
+        DeliveryState.SENDING -> "Sending"
+        DeliveryState.RETRYING -> "Waiting to retry"
+        DeliveryState.DELIVERED -> "Delivered"
+        DeliveryState.FAILED -> "Failed / review required"
+        DeliveryState.CANCELLED -> "Cancelled"
+        else -> item.state
+    }
+    Card(colors = CardDefaults.cardColors(containerColor = NavyCard)) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(label, color = if (item.state == DeliveryState.DELIVERED) CyanAccent else TextPrimary)
+            Text(item.appName + ": " + item.title, color = TextPrimary)
+            Text(item.text, color = TextSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Text("Attempts: " + item.attempts + " · Auto-retry: " + if (item.autoRetry) "on" else "off", color = TextSecondary, fontSize = 11.sp)
+            Text(SimpleDateFormat("dd MMM, HH:mm:ss", Locale.getDefault()).format(Date(item.capturedAt)), color = TextSecondary, fontSize = 11.sp)
+            item.httpStatus?.let { Text("HTTP " + it, color = TextSecondary, fontSize = 11.sp) }
+            item.error?.let { Text(it, color = ErrorRed, fontSize = 11.sp, maxLines = 3, overflow = TextOverflow.Ellipsis) }
+            if (item.state == DeliveryState.FAILED) {
+                Text("Check the receiver before retrying an unknown outcome.", color = TextSecondary, fontSize = 11.sp)
+                TextButton(onClick = onRetry) { Text("Retry delivery") }
+            }
+        }
     }
 }

@@ -40,6 +40,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all { it.workingDir = projectDir }
+    }
     buildFeatures {
         compose = true
     }
@@ -57,6 +61,7 @@ dependencies {
     androidTestImplementation(libs.room.testing)
 
     // ── JSON serialization (used by TypeConverters & NotificationPusher) ─────
+    implementation("androidx.work:work-runtime-ktx:2.11.0")
     implementation(libs.gson)
 
     // ── OkHttp ───────────────────────────────────────────────────────────────
@@ -79,6 +84,11 @@ dependencies {
 
     // ── Test ─────────────────────────────────────────────────────────────────
     testImplementation(libs.junit)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.robolectric:robolectric:4.16")
+    testImplementation("androidx.work:work-testing:2.11.0")
+    testImplementation(libs.room.testing)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
 }

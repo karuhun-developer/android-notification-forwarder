@@ -48,6 +48,9 @@ interface InterceptRuleDao {
     @Update
     suspend fun updateRule(rule: InterceptRule)
 
+    @Query("UPDATE intercept_rules SET autoRetry = :enabled WHERE id = :id")
+    suspend fun setAutoRetry(id: Int, enabled: Boolean)
+
     /**
      * Deletes a specific rule.
      */

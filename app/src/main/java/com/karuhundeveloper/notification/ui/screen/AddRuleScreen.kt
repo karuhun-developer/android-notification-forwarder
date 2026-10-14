@@ -58,6 +58,7 @@ fun AddRuleScreen(
     var selectedApps by remember { mutableStateOf<Set<String>>(emptySet()) }
     var apiUrl by remember { mutableStateOf("") }
     var selectedMethod by remember { mutableStateOf("POST") }
+    var autoRetry by remember { mutableStateOf(false) }
     var customHeaders by remember { mutableStateOf("") }
 
     // ── App Picker state ──────────────────────────────────────────────────────
@@ -123,7 +124,8 @@ fun AddRuleScreen(
                 targetApps = selectedApps.toList(),
                 apiUrl = apiUrl.trim(),
                 apiMethod = selectedMethod,
-                customHeaders = parsedHeaders
+                customHeaders = parsedHeaders,
+                autoRetry = autoRetry
             )
         )
         onNavigateBack()
@@ -283,6 +285,14 @@ fun AddRuleScreen(
                         }
                     }
                 }
+            }
+
+            FormSection(title = "Delivery", icon = Icons.Default.Refresh) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Automatic retry", modifier = Modifier.weight(1f), color = TextPrimary)
+                    Switch(checked = autoRetry, onCheckedChange = { autoRetry = it })
+                }
+                Text("Enable only when the endpoint deduplicates X-Delivery-Id. Network errors and HTTP 408/429/5xx retry up to 10 attempts.", color = TextSecondary, fontSize = 12.sp)
             }
 
             // ── Custom Headers ────────────────────────────────────────────────

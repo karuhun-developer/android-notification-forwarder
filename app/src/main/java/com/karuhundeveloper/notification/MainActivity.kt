@@ -1,6 +1,11 @@
 package com.karuhundeveloper.notification
 
 import android.os.Bundle
+import android.util.Log
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import com.karuhundeveloper.notification.delivery.DeliveryScheduler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -31,6 +36,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        lifecycleScope.launch {
+            try {
+                val scheduler = DeliveryScheduler(applicationContext)
+                scheduler.installRecovery()
+                scheduler.recover()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Cannot recover delivery queue", e)
+            }
+        }
         enableEdgeToEdge()
         setContent {
             NotificationInterceptorTheme {

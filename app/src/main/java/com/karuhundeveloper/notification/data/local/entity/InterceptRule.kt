@@ -28,5 +28,8 @@ data class InterceptRule(
     val apiMethod: String,
 
     // Stored as a JSON object string; converted by StringMapConverter
-    val customHeaders: Map<String, String>
+    val customHeaders: Map<String, String>,
+
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    val autoRetry: Boolean = false
 )

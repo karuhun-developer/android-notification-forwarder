@@ -43,5 +43,7 @@ sealed class PushResult {
      *
      * @property method The method string that was rejected (e.g. "PATCH", "PURGE").
      */
+    data class ConfigurationError(val message: String) : PushResult()
+
     data class UnsupportedMethod(val method: String) : PushResult()
 }
