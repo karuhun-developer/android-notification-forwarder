@@ -4,6 +4,14 @@ Aplikasi Android generik yang meneruskan notifikasi sesuai package/rule ke endpo
 
 Listener meneruskan isi notifikasi; konfirmasi pembayaran, parser merchant, dashboard, dan audio dikerjakan oleh receiver terpisah. Rancangan soundbox tersedia pada workspace lokal terpisah di `../qris-soundbox/readme.md`.
 
+## Demo
+
+![Demo Android Notification Forwarder](demo.gif)
+
+## Contoh hasil webhook
+
+![Contoh hasil notifikasi yang diteruskan ke webhook](image.png)
+
 ## Fitur yang sudah dibuat
 
 - Routing berdasarkan package aplikasi, endpoint, method, dan custom headers.
