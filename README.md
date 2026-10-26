@@ -1,8 +1,8 @@
 # Notification Interceptor / Android Notification Forwarder
 
-An Android app that forwards notifications to HTTP endpoints based on app packages and routing rules. It includes a queue stored in Room, WorkManager scheduling, event and delivery identifiers, optional retries, and delivery history for use cases such as a QRIS payment soundbox.
+An Android app that forwards notifications to HTTP endpoints based on app packages and routing rules. It includes a queue stored in Room, WorkManager scheduling, event and delivery identifiers, optional retries, and delivery history.
 
-The listener forwards notification content. A separate receiver handles payment confirmation, merchant notification parsing, the dashboard, and audio playback. The soundbox design is available in a separate local workspace at `../qris-soundbox/readme.md`.
+The listener forwards notification content to the endpoints you configure. Your receiver can process the payload and integrate it with other services.
 
 ## Demo
 
@@ -40,18 +40,16 @@ Set `ANDROID_HOME` to your local SDK path or configure `sdk.dir` in `local.prope
 ## Listener and Rule Setup
 
 1. Open the app and grant **Notification access** in Settings. Permission being granted and the listener service being connected are separate conditions; check the app's status indicators.
-2. Select the package of the app that posts the merchant's payment receipt notifications. Do not select the payer's app simply because the customer uses that wallet.
-3. Create a rule with the receiver URL, HTTP method, and custom headers. The soundbox design uses HTTPS POST requests with an ingestion token.
+2. Select the package names of the apps whose notifications you want to forward.
+3. Create a rule with your endpoint URL, HTTP method, and any required custom headers.
 4. To send a dummy notification, add the package `com.karuhundeveloper.notification`. On Android 13+, grant POST_NOTIFICATIONS permission, then tap **Send Dummy**. This permission is for dummy notifications and does not replace Notification access.
 5. Open the rule's History to check deliveries and endpoint responses. HTTP 2xx only indicates that the endpoint accepted the request.
 
-Example custom headers for a receiver that accepts a token:
+Example custom headers for an endpoint that requires a bearer token:
 
 ```json
-{ "Authorization": "Bearer <device-ingestion-token>" }
+{ "Authorization": "Bearer <api-token>" }
 ```
-
-The `/api/v1/notifications` endpoint in the soundbox document is still a design proposal; this Android repository does not provide it. Merchant notification parsers for DANA, OVO, and ShopeePay have not been verified.
 
 ## Request Contract
 
@@ -59,7 +57,7 @@ POST, PUT, and PATCH use a JSON body with the four existing fields:
 
 ```json
 {
-  "app_name": "Merchant App",
+  "app_name": "Example App",
   "notification_title": "<original title>",
   "notification_text": "<original text>",
   "timestamp_ms": 1791939600000
@@ -74,9 +72,9 @@ GET sends the same fields as query parameters; DELETE sends no body. Custom head
 | `X-Delivery-Id` | UUID for one delivery to one rule |
 | `X-Notification-Package` | Android package of the source app |
 
-Internal headers are applied after custom headers so they cannot be overwritten. A unique event/rule pair prevents replays of identical notifications from creating another delivery. Changes to the title, text, or post time can create a new event; this event ID is not a payment provider's transaction reference.
+Internal headers are applied after custom headers so they cannot be overwritten. A unique event/rule pair prevents replays of identical notifications from creating another delivery. Changes to the title, text, or post time can create a new event.
 
-`timestamp_ms` is the first capture time stored for the delivery. The Android post time is stored locally but is not sent. An older notification that is still active when the listener reconnects may receive a new capture timestamp; receivers must not treat this timestamp as proof of when the payment occurred.
+`timestamp_ms` is the first capture time stored for the delivery. The Android post time is stored locally but is not sent. An older notification that is still active when the listener reconnects may receive a new capture timestamp; receivers should treat it as the capture time recorded by this app.
 
 ## Queue and Retries
 
@@ -99,9 +97,9 @@ If a worker is interrupted during SENDING, an expired lease is recovered for a r
 
 ## Data and Recovery Limits
 
-The queue survives restarts after the Room transaction commits successfully. Process death before the commit, notifications that are never posted, notifications that disappear while the listener is disconnected, force-stops, and OEM restrictions can still cause missed captures. Catch-up only reads notifications that are still active, not transaction history.
+The queue survives restarts after the Room transaction commits successfully. Process death before the commit, notifications that are never posted, notifications that disappear while the listener is disconnected, force-stops, and OEM restrictions can still cause missed captures. Catch-up only reads notifications that are still active.
 
-The listener does not run until the device is unlocked after a reboot. Periodic WorkManager recovery has a minimum interval of 15 minutes, and its schedule is not exact. Device QA has not yet covered reboot, reconnect, Doze/OEM behavior, visual appearance, or large fonts. Exactly-once delivery and audio playback are not guaranteed.
+The listener does not run until the device is unlocked after a reboot. Periodic WorkManager recovery has a minimum interval of 15 minutes, and its schedule is not exact. Device QA has not yet covered reboot, reconnect, Doze/OEM behavior, visual appearance, or large fonts. Exactly-once delivery is not guaranteed.
 
 Clear history only removes older history entries. Deliveries are retained for deduplication; safe purging has not been implemented. The database and installation identity are excluded from backups, cloud restoration, and device transfer. Rules, history, and queued deliveries are not restored from backups; reinstalling the app or clearing its data removes them. Headers and tokens are stored in the app's local database.
 
