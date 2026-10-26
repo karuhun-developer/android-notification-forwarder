@@ -1,32 +1,32 @@
 # Notification Interceptor / Android Notification Forwarder
 
-Aplikasi Android generik yang meneruskan notifikasi sesuai package/rule ke endpoint HTTP. Versi kerja ini menambahkan antrean Room, WorkManager, identitas event/delivery, retry opt-in, dan riwayat delivery untuk kebutuhan seperti QRIS soundbox.
+An Android app that forwards notifications to HTTP endpoints based on app packages and routing rules. It includes a queue stored in Room, WorkManager scheduling, event and delivery identifiers, optional retries, and delivery history for use cases such as a QRIS payment soundbox.
 
-Listener meneruskan isi notifikasi; konfirmasi pembayaran, parser merchant, dashboard, dan audio dikerjakan oleh receiver terpisah. Rancangan soundbox tersedia pada workspace lokal terpisah di `../qris-soundbox/readme.md`.
+The listener forwards notification content. A separate receiver handles payment confirmation, merchant notification parsing, the dashboard, and audio playback. The soundbox design is available in a separate local workspace at `../qris-soundbox/readme.md`.
 
 ## Demo
 
-![Demo Android Notification Forwarder](demo.gif)
+![Android Notification Forwarder demo](demo.gif)
 
-## Contoh hasil webhook
+## Webhook Result Example
 
-![Contoh hasil notifikasi yang diteruskan ke webhook](image.png)
+![Example of a notification forwarded to a webhook](image.png)
 
-## Fitur yang sudah dibuat
+## Features
 
-- Routing berdasarkan package aplikasi, endpoint, method, dan custom headers.
-- Snapshot delivery disimpan sebelum HTTP: payload, endpoint, headers, dan setting retry tetap untuk delivery tersebut.
-- WorkManager dengan network constraint, backoff, recovery saat app dibuka/listener connect, dan recovery periodik.
-- Identitas tetap untuk replay/retry, claim atomik, lease, dan completion yang memeriksa token pemilik.
-- Retry otomatis default mati; dapat diaktifkan per rule untuk notifikasi berikutnya.
-- History menampilkan state, attempts, HTTP/error, serta retry manual pada FAILED. History lama ditampilkan terpisah.
-- Catch-up notifikasi yang masih aktif saat reconnect serta request rebind.
-- Migrasi Room v1/v2 ke v3 mempertahankan rule/history; tidak memakai destructive fallback.
-- [GitHub Actions](.github/workflows/android-release.yml) untuk tes, lint, build, dan GitHub Release ketika tag versi dipush.
+- Route notifications by app package, endpoint, HTTP method, and custom headers.
+- Save a delivery snapshot before sending the HTTP request: its payload, endpoint, headers, and retry settings remain fixed.
+- Schedule work with network constraints and backoff, recover pending deliveries when the app opens or the listener connects, and run periodic recovery.
+- Keep identifiers stable across replays and retries, claim deliveries atomically, use leases, and verify the ownership token before completing a delivery.
+- Automatic retries are disabled by default and can be enabled per rule for future notifications.
+- View delivery states, attempt counts, HTTP responses or errors, and manually retry FAILED deliveries. Older history is displayed separately.
+- Catch up on notifications that are still active when the listener reconnects, and request listener rebinding.
+- Migrate Room v1/v2 to v3 while preserving rules and history, without a destructive fallback.
+- Use [GitHub Actions](.github/workflows/android-release.yml) to test, lint, build, and publish a GitHub Release when a version tag is pushed.
 
-## Build dan install
+## Build and Install
 
-Gunakan JDK 21, Android SDK Platform 36.1, Build Tools 36.0.0, serta Gradle wrapper repo. Compile SDK 36.1, target SDK 36, minimum Android API 24. Target bytecode Java 11 tidak berarti build cukup memakai JDK 11. Validasi lokal menggunakan JDK 21; hasil dan batas environment ada di [laporan reliabilitas](docs/reliability.md).
+Use JDK 21, Android SDK Platform 36.1, Build Tools 36.0.0, and the repository's Gradle wrapper. The compile SDK is 36.1, the target SDK is 36, and the minimum Android API level is 24. Targeting Java 11 bytecode does not mean JDK 11 is sufficient to build the app. Local validation used JDK 21; results and environment limitations are documented in the [reliability report](docs/reliability.md).
 
 ```bash
 git clone https://github.com/karuhun-developer/android-notification-forwarder.git
@@ -35,87 +35,87 @@ bash gradlew :app:assembleDebug
 bash gradlew :app:installDebug
 ```
 
-Set `ANDROID_HOME` ke SDK lokal atau konfigurasi `sdk.dir` di `local.properties`. APK debug ada di `app/build/outputs/apk/debug/app-debug.apk`. `assembleRelease` menghasilkan APK unsigned karena keystore produksi belum dikonfigurasi.
+Set `ANDROID_HOME` to your local SDK path or configure `sdk.dir` in `local.properties`. The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. `assembleRelease` produces an unsigned APK because a production keystore has not been configured.
 
-## Setup listener dan rule
+## Listener and Rule Setup
 
-1. Buka aplikasi dan beri **Notification access** dari Settings. Akses yang diberikan dan status service connected adalah kondisi berbeda; periksa indikator aplikasi.
-2. Pilih package aplikasi yang menerbitkan notifikasi penerimaan merchant. Jangan memilih aplikasi pembayar hanya karena wallet tersebut dipakai pelanggan.
-3. Buat rule dengan URL receiver, method, dan custom headers. Soundbox dirancang memakai POST HTTPS dengan token ingestion.
-4. Untuk dummy, tambahkan package `com.karuhundeveloper.notification`. Pada Android 13+ beri izin POST_NOTIFICATIONS lalu tekan **Send Dummy**. Izin ini untuk dummy, bukan pengganti Notification access.
-5. Buka History rule untuk memeriksa delivery dan respons endpoint. HTTP 2xx hanya menyatakan endpoint menerima request.
+1. Open the app and grant **Notification access** in Settings. Permission being granted and the listener service being connected are separate conditions; check the app's status indicators.
+2. Select the package of the app that posts the merchant's payment receipt notifications. Do not select the payer's app simply because the customer uses that wallet.
+3. Create a rule with the receiver URL, HTTP method, and custom headers. The soundbox design uses HTTPS POST requests with an ingestion token.
+4. To send a dummy notification, add the package `com.karuhundeveloper.notification`. On Android 13+, grant POST_NOTIFICATIONS permission, then tap **Send Dummy**. This permission is for dummy notifications and does not replace Notification access.
+5. Open the rule's History to check deliveries and endpoint responses. HTTP 2xx only indicates that the endpoint accepted the request.
 
-Contoh custom headers untuk receiver yang menerima token:
+Example custom headers for a receiver that accepts a token:
 
 ```json
 { "Authorization": "Bearer <device-ingestion-token>" }
 ```
 
-Endpoint `/api/v1/notifications` dalam dokumen soundbox masih rancangan; tidak disediakan oleh repo Android ini. Belum ada parser merchant DANA/OVO/ShopeePay yang terverifikasi.
+The `/api/v1/notifications` endpoint in the soundbox document is still a design proposal; this Android repository does not provide it. Merchant notification parsers for DANA, OVO, and ShopeePay have not been verified.
 
-## Kontrak request
+## Request Contract
 
-POST, PUT, dan PATCH memakai body JSON dengan empat field lama:
+POST, PUT, and PATCH use a JSON body with the four existing fields:
 
 ```json
 {
   "app_name": "Merchant App",
-  "notification_title": "<judul asli>",
-  "notification_text": "<teks asli>",
+  "notification_title": "<original title>",
+  "notification_text": "<original text>",
   "timestamp_ms": 1791939600000
 }
 ```
 
-GET mengirim field yang sama sebagai query parameters; DELETE tidak mengirim body. Custom headers tetap dilampirkan. Delivery dari antrean menambahkan:
+GET sends the same fields as query parameters; DELETE sends no body. Custom headers are included with every request. Queued deliveries add these headers:
 
-| Header | Nilai |
+| Header | Value |
 | --- | --- |
-| `X-Notification-Event-Id` | SHA-256 installation UUID, notification key, post time, title, text |
-| `X-Delivery-Id` | UUID satu delivery ke satu rule |
-| `X-Notification-Package` | Package sumber Android |
+| `X-Notification-Event-Id` | SHA-256 of the installation UUID, notification key, post time, title, and text |
+| `X-Delivery-Id` | UUID for one delivery to one rule |
+| `X-Notification-Package` | Android package of the source app |
 
-Header internal dipasang setelah custom headers agar tidak tertimpa. Unique event + rule mencegah replay notifikasi identik membuat delivery lain. Perubahan judul/teks/post time dapat membentuk event baru; event ID ini bukan referensi transaksi provider.
+Internal headers are applied after custom headers so they cannot be overwritten. A unique event/rule pair prevents replays of identical notifications from creating another delivery. Changes to the title, text, or post time can create a new event; this event ID is not a payment provider's transaction reference.
 
-`timestamp_ms` adalah waktu capture pertama yang tersimpan untuk delivery. Android post time disimpan lokal tetapi tidak dikirim. Notifikasi lama yang masih aktif saat reconnect dapat memiliki capture timestamp baru; receiver tidak boleh menganggap timestamp ini bukti waktu terjadinya pembayaran.
+`timestamp_ms` is the first capture time stored for the delivery. The Android post time is stored locally but is not sent. An older notification that is still active when the listener reconnects may receive a new capture timestamp; receivers must not treat this timestamp as proof of when the payment occurred.
 
-## Antrean dan retry
+## Queue and Retries
 
-| State | Arti |
+| State | Meaning |
 | --- | --- |
-| QUEUED | Sudah tersimpan, menunggu work/jaringan |
-| SENDING | Sedang dimiliki worker melalui lease |
-| RETRYING | Menunggu attempt berikutnya |
-| DELIVERED | Endpoint mengembalikan HTTP 2xx |
-| FAILED | Memerlukan pemeriksaan/manual retry |
-| CANCELLED | Rule dihapus; delivery dihentikan |
+| QUEUED | Saved, waiting for scheduled work or network access |
+| SENDING | Owned by a worker through a lease |
+| RETRYING | Waiting for the next attempt |
+| DELIVERED | The endpoint returned HTTP 2xx |
+| FAILED | Requires inspection or a manual retry |
+| CANCELLED | The rule was deleted; delivery was stopped |
 
-Auto-retry **default mati**, termasuk rule hasil migrasi. Jika diaktifkan, network error dan HTTP 408/429/5xx dapat dicoba ulang sampai 10 attempts per siklus. Error konfigurasi, redirect, dan permanent 4xx berhenti. Backoff WorkManager eksponensial mulai 30 detik; scheduler Android dapat menundanya.
+Automatic retries are **disabled by default**, including for migrated rules. When enabled, network errors and HTTP 408/429/5xx responses can be retried, with up to 10 attempts per cycle. Configuration errors, redirects, and permanent HTTP 4xx errors stop retries. WorkManager uses exponential backoff starting at 30 seconds; Android scheduling may delay execution further.
 
-Client bawaan mematikan redirect serta retry koneksi implisit dan mencegah follow-up otomatis HTTP 503 dengan `Retry-After: 0`. Setiap attempt ditangani kebijakan delivery. Lease 120 detik dan total call timeout 45 detik. Client custom yang diinject perlu mempertahankan kebijakan yang sama.
+The built-in client disables redirects and implicit connection retries, and prevents automatic follow-up requests for HTTP 503 responses with `Retry-After: 0`. Each attempt is governed by the delivery policy. The lease lasts 120 seconds, and the total call timeout is 45 seconds. Any injected custom client must preserve the same behavior.
 
-Request yang terputus bisa sudah diterima receiver. Aktifkan retry hanya setelah receiver menyimpan event sebelum ACK serta mendeduplikasi identitas delivery. Retry manual mengantrekan ulang FAILED dengan ID/body tetap, mereset attempts, dan mempertahankan endpoint/settings snapshot. Klik stale tidak membatalkan work yang sudah antre.
+An interrupted request may already have reached the receiver. Enable retries only after the receiver stores events before acknowledging them and deduplicates delivery identifiers. A manual retry requeues a FAILED delivery with the same ID and body, resets the attempt count, and preserves the endpoint and settings snapshot. Stale UI clicks do not cancel work that is already queued.
 
-Jika worker terputus saat SENDING, lease expired dipulihkan sebagai retry hanya bila opt-in dan budget tersedia. Selain itu hasil menjadi FAILED dengan outcome unknown. Periksa receiver sebelum retry manual. Menghapus rule menghentikan antrean tetapi tidak menarik request yang sudah diterima server.
+If a worker is interrupted during SENDING, an expired lease is recovered for a retry only when retries are enabled and attempts remain. Otherwise, the delivery becomes FAILED with an unknown outcome. Check the receiver before retrying manually. Deleting a rule stops its queued deliveries but cannot recall requests the server has already received.
 
-## Data dan batas pemulihan
+## Data and Recovery Limits
 
-Antrean mulai tahan restart setelah commit Room berhasil. Process death sebelum commit, notifikasi yang tidak pernah terbit, notifikasi yang hilang saat listener mati, force-stop, dan pembatasan OEM tetap bisa menyebabkan kehilangan capture. Catch-up hanya membaca notifikasi yang masih outstanding, bukan riwayat transaksi.
+The queue survives restarts after the Room transaction commits successfully. Process death before the commit, notifications that are never posted, notifications that disappear while the listener is disconnected, force-stops, and OEM restrictions can still cause missed captures. Catch-up only reads notifications that are still active, not transaction history.
 
-Listener tidak berjalan sebelum unlock setelah reboot. WorkManager recovery periodik minimum 15 menit dan jadwalnya tidak exact. Belum ada QA perangkat untuk reboot, reconnect, Doze/OEM, maupun visual/font besar. Pengiriman maupun bunyi tepat satu kali tidak dijanjikan.
+The listener does not run until the device is unlocked after a reboot. Periodic WorkManager recovery has a minimum interval of 15 minutes, and its schedule is not exact. Device QA has not yet covered reboot, reconnect, Doze/OEM behavior, visual appearance, or large fonts. Exactly-once delivery and audio playback are not guaranteed.
 
-Clear history hanya menghapus history lama. Delivery dipertahankan untuk dedup; purge aman belum dibuat. Database dan installation identity dikecualikan dari backup/cloud/device transfer. Rules/history/queue tidak dipulihkan lewat backup; reinstall atau clear data menghilangkannya. Headers/token disimpan dalam database app lokal.
+Clear history only removes older history entries. Deliveries are retained for deduplication; safe purging has not been implemented. The database and installation identity are excluded from backups, cloud restoration, and device transfer. Rules, history, and queued deliveries are not restored from backups; reinstalling the app or clearing its data removes them. Headers and tokens are stored in the app's local database.
 
-## Tes dan release
+## Tests and Releases
 
 ```bash
 bash gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease
 ```
 
-Suite menggunakan Room, Robolectric, WorkManager test API, dan MockWebServer. Full suite pada GitHub Actions untuk `v1.2.1` lulus: 24 tes, tanpa failure/error/skip; lint 0 error dan 37 warning. [Laporan reliabilitas](docs/reliability.md) mencatat bukti hosted dan hasil lokal dengan keterbatasan emulasi host ARM.
+The test suite uses Room, Robolectric, the WorkManager test API, and MockWebServer. The full suite passed on GitHub Actions for `v1.2.1`: 24 tests with no failures, errors, or skipped tests; lint reported 0 errors and 37 warnings. The [reliability report](docs/reliability.md) records hosted validation evidence and local results, including emulation limitations on an ARM host.
 
-Tag seperti `v1.0.0` atau `v1.1.0-beta.1` memicu workflow. Build harus lulus tes/lint sebelum APK dan checksum dipublikasikan. Detail trigger, artifacts, signing, dan cara menjalankan ada di [panduan CI/release](docs/ci-release.md).
+Tags such as `v1.0.0` or `v1.1.0-beta.1` trigger the workflow. Tests and lint must pass before APKs and checksums are published. See the [CI and release guide](docs/ci-release.md) for triggers, artifacts, signing, and instructions for running the workflow.
 
-[Release v1.2.1](https://github.com/karuhun-developer/android-notification-forwarder/releases/tag/v1.2.1) menyediakan APK debug untuk pengujian, APK release unsigned, dan checksum SHA-256. Push tag ini berhasil memicu build dan publish otomatis.
+[Release v1.2.1](https://github.com/karuhun-developer/android-notification-forwarder/releases/tag/v1.2.1) provides a debug APK for testing, an unsigned release APK, and SHA-256 checksums. Pushing this tag successfully triggered the automated build and publication.
 
 ## License
 
