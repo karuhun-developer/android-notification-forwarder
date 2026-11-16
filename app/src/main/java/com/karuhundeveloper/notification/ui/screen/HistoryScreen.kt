@@ -18,19 +18,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.karuhundeveloper.notification.R
 import com.karuhundeveloper.notification.data.local.entity.NotificationDelivery
 import com.karuhundeveloper.notification.delivery.DeliveryState
 import com.karuhundeveloper.notification.data.local.entity.InterceptHistory
 import com.karuhundeveloper.notification.ui.theme.*
 import com.karuhundeveloper.notification.ui.viewmodel.RulesViewModel
-import java.text.SimpleDateFormat
-import java.util.*
+import java.text.DateFormat
+import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,19 +54,19 @@ fun HistoryScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("History", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        Text(stringResource(R.string.history), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                         Text(ruleName, fontSize = 12.sp, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back), tint = TextPrimary)
                     }
                 },
                 actions = {
                     if (history.isNotEmpty()) {
                         IconButton(onClick = { viewModel.clearHistoryForRule(ruleId) }) {
-                            Icon(Icons.Default.DeleteSweep, contentDescription = "Clear legacy history", tint = ErrorRed)
+                            Icon(Icons.Default.DeleteSweep, contentDescription = stringResource(R.string.clear_legacy_history), tint = ErrorRed)
                         }
                     }
                 },
@@ -81,12 +84,12 @@ fun HistoryScreen(
                     Card(colors = CardDefaults.cardColors(containerColor = NavyCard)) {
                         Column(Modifier.padding(12.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Auto-retry future notifications", color = TextPrimary,
+                                Text(stringResource(R.string.auto_retry_future_notifications), color = TextPrimary,
                                     modifier = Modifier.weight(1f))
                                 Switch(checked = current.autoRetry,
                                     onCheckedChange = { viewModel.setAutoRetry(ruleId, it) })
                             }
-                            Text("Enable only when the receiver deduplicates X-Delivery-Id. Existing deliveries keep their captured setting.",
+                            Text(stringResource(R.string.auto_retry_future_hint),
                                 color = TextSecondary, fontSize = 12.sp)
                         }
                     }
@@ -96,13 +99,13 @@ fun HistoryScreen(
                 item { EmptyHistoryPlaceholder(modifier = Modifier.height(240.dp)) }
             }
             if (deliveries.isNotEmpty()) {
-                item { Text("Deliveries", color = TextPrimary, fontWeight = FontWeight.Bold) }
+                item { Text(stringResource(R.string.deliveries), color = TextPrimary, fontWeight = FontWeight.Bold) }
                 items(deliveries, key = { "delivery:" + it.id }) { item ->
                     DeliveryCard(item, onRetry = { viewModel.retryDelivery(item.id) })
                 }
             }
             if (history.isNotEmpty()) {
-                item { Text("Legacy history · clear removes these entries only", color = TextSecondary, fontSize = 12.sp) }
+                item { Text(stringResource(R.string.legacy_history_note), color = TextSecondary, fontSize = 12.sp) }
                 items(history, key = { "history:" + it.id }) { item -> HistoryItemCard(item) }
             }
         }
@@ -110,9 +113,20 @@ fun HistoryScreen(
 }
 
 @Composable
+private fun formatTimestamp(timestamp: Long): String {
+    val locale = LocalConfiguration.current.locales[0]
+    return DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM, locale)
+        .format(Date(timestamp))
+}
+
+@Composable
 private fun HistoryItemCard(item: InterceptHistory) {
-    val sdf = SimpleDateFormat("dd MMM, HH:mm:ss", Locale.getDefault())
-    val dateStr = sdf.format(Date(item.timestamp))
+    val dateStr = formatTimestamp(item.timestamp)
+    val errorDetail = when {
+        item.errorMessage != null -> item.errorMessage
+        item.httpStatusCode != null -> stringResource(R.string.status_with_code, item.httpStatusCode)
+        else -> stringResource(R.string.status_unknown)
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -124,7 +138,7 @@ private fun HistoryItemCard(item: InterceptHistory) {
                 StatusDot(isSuccess = item.isSuccess)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = if (item.isSuccess) "Success" else "Failed",
+                    text = stringResource(if (item.isSuccess) R.string.success else R.string.failed),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (item.isSuccess) CyanAccent else ErrorRed
@@ -135,9 +149,9 @@ private fun HistoryItemCard(item: InterceptHistory) {
             
             Spacer(Modifier.height(8.dp))
             
-            Text("Notification:", fontSize = 10.sp, color = IndigoLight, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.notification_label), fontSize = 10.sp, color = IndigoLight, fontWeight = FontWeight.Bold)
             Text(
-                "${item.appName}: ${item.notificationTitle}",
+                stringResource(R.string.app_notification_title, item.appName, item.notificationTitle),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = TextPrimary,
@@ -155,14 +169,14 @@ private fun HistoryItemCard(item: InterceptHistory) {
                     Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = "Error: ${item.errorMessage ?: "Status ${item.httpStatusCode}"}",
+                        text = stringResource(R.string.error_with_detail, errorDetail),
                         fontSize = 11.sp,
                         color = ErrorRed
                     )
                 }
             } else if (item.httpStatusCode != null) {
                 Spacer(Modifier.height(4.dp))
-                Text("HTTP ${item.httpStatusCode}", fontSize = 10.sp, color = CyanAccent.copy(alpha = 0.7f))
+                Text(stringResource(R.string.http_status, item.httpStatusCode), fontSize = 10.sp, color = CyanAccent.copy(alpha = 0.7f))
             }
         }
     }
@@ -192,33 +206,33 @@ private fun EmptyHistoryPlaceholder(modifier: Modifier = Modifier) {
             modifier = Modifier.size(64.dp)
         )
         Spacer(Modifier.height(16.dp))
-        Text("No history for this rule", color = TextSecondary, fontSize = 14.sp)
+        Text(stringResource(R.string.no_history_for_rule), color = TextSecondary, fontSize = 14.sp)
     }
 }
 
 @Composable
 private fun DeliveryCard(item: NotificationDelivery, onRetry: () -> Unit) {
     val label = when (item.state) {
-        DeliveryState.QUEUED -> "Queued"
-        DeliveryState.SENDING -> "Sending"
-        DeliveryState.RETRYING -> "Waiting to retry"
-        DeliveryState.DELIVERED -> "Delivered"
-        DeliveryState.FAILED -> "Failed / review required"
-        DeliveryState.CANCELLED -> "Cancelled"
+        DeliveryState.QUEUED -> stringResource(R.string.status_queued)
+        DeliveryState.SENDING -> stringResource(R.string.status_sending)
+        DeliveryState.RETRYING -> stringResource(R.string.status_retrying)
+        DeliveryState.DELIVERED -> stringResource(R.string.status_delivered)
+        DeliveryState.FAILED -> stringResource(R.string.status_failed_review)
+        DeliveryState.CANCELLED -> stringResource(R.string.status_cancelled)
         else -> item.state
     }
     Card(colors = CardDefaults.cardColors(containerColor = NavyCard)) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(label, color = if (item.state == DeliveryState.DELIVERED) CyanAccent else TextPrimary)
-            Text(item.appName + ": " + item.title, color = TextPrimary)
+            Text(stringResource(R.string.app_notification_title, item.appName, item.title), color = TextPrimary)
             Text(item.text, color = TextSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            Text("Attempts: " + item.attempts + " · Auto-retry: " + if (item.autoRetry) "on" else "off", color = TextSecondary, fontSize = 11.sp)
-            Text(SimpleDateFormat("dd MMM, HH:mm:ss", Locale.getDefault()).format(Date(item.capturedAt)), color = TextSecondary, fontSize = 11.sp)
-            item.httpStatus?.let { Text("HTTP " + it, color = TextSecondary, fontSize = 11.sp) }
+            Text(stringResource(R.string.attempts_auto_retry, item.attempts, stringResource(if (item.autoRetry) R.string.on else R.string.off)), color = TextSecondary, fontSize = 11.sp)
+            Text(formatTimestamp(item.capturedAt), color = TextSecondary, fontSize = 11.sp)
+            item.httpStatus?.let { Text(stringResource(R.string.http_status, it), color = TextSecondary, fontSize = 11.sp) }
             item.error?.let { Text(it, color = ErrorRed, fontSize = 11.sp, maxLines = 3, overflow = TextOverflow.Ellipsis) }
             if (item.state == DeliveryState.FAILED) {
-                Text("Check the receiver before retrying an unknown outcome.", color = TextSecondary, fontSize = 11.sp)
-                TextButton(onClick = onRetry) { Text("Retry delivery") }
+                Text(stringResource(R.string.check_receiver_before_retry), color = TextSecondary, fontSize = 11.sp)
+                TextButton(onClick = onRetry) { Text(stringResource(R.string.retry_delivery)) }
             }
         }
     }

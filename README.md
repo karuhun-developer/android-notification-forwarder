@@ -37,6 +37,21 @@ bash gradlew :app:installDebug
 
 Set `ANDROID_HOME` to your local SDK path or configure `sdk.dir` in `local.properties`. The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. `assembleRelease` produces an unsigned APK because a production keystore has not been configured.
 
+The Dockerfile provides the same JDK and Android SDK toolchain for a container build. From the repository root:
+
+```sh
+docker build --platform linux/amd64 -t notification-forwarder-android .
+docker run --rm --platform linux/amd64 -v "${PWD}:/workspace" -v notification-forwarder-gradle:/root/.gradle notification-forwarder-android
+```
+
+The container runs lint and a debug build by default. Build outputs appear in the mounted repository. Pass Gradle task arguments to run other checks, including :app:testDebugUnitTest. On ARM hosts, the full HTTP test suite can fail during socket shutdown under x86 emulation; use a native x86-64 runner for that suite (see [reliability notes](docs/reliability.md)).
+
+## Languages
+
+The app includes English and Indonesian. Tap the globe icon on the main screen to choose Follow system, Bahasa Indonesia, or English. The choice is saved across launches; Follow system uses the device language and falls back to English when no translation exists.
+
+To contribute another language, add a matching Android locale resource directory (for example, values-zh for Chinese; Indonesian uses values-in) and list the language in app/src/main/res/xml/locales_config.xml and the in-app language picker. Translate all entries from app/src/main/res/values/strings.xml except those marked translatable="false", and keep placeholders such as %1$s and %1$d intact. Chinese is open for a contributor translation.
+
 ## Listener and Rule Setup
 
 1. Open the app and grant **Notification access** in Settings. Permission being granted and the listener service being connected are separate conditions; check the app's status indicators.

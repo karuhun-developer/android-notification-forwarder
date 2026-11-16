@@ -18,6 +18,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,11 +43,14 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.os.LocaleListCompat
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.karuhundeveloper.notification.R
 import com.karuhundeveloper.notification.data.local.entity.InterceptRule
 import com.karuhundeveloper.notification.service.AppNotificationListener
 import com.karuhundeveloper.notification.ui.component.MethodBadge
@@ -101,17 +106,17 @@ fun postDummyNotification(context: Context) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         val channel = NotificationChannel(
             DUMMY_CHANNEL_ID,
-            "Test Notifications",
+            context.getString(R.string.test_notification_channel),
             NotificationManager.IMPORTANCE_DEFAULT
-        ).apply { description = "Channel for dummy test notifications" }
+        ).apply { description = context.getString(R.string.test_notification_channel_description) }
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(channel)
     }
 
     val notification = NotificationCompat.Builder(context, DUMMY_CHANNEL_ID)
         .setSmallIcon(android.R.drawable.ic_dialog_info)
-        .setContentTitle("Test Notification")
-        .setContentText("This is a dummy notification for testing rules.")
+        .setContentTitle(context.getString(R.string.test_notification_title))
+        .setContentText(context.getString(R.string.test_notification_body))
         .setPriority(NotificationCompat.PRIORITY_DEFAULT)
         .setAutoCancel(true)
         .build()
@@ -195,17 +200,18 @@ fun MainScreen(
     ) { granted -> notifyPermGranted = granted }
 
     var showDeleteDialog by remember { mutableStateOf<InterceptRule?>(null) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = NavyDeep,
-        topBar = { MainTopBar() },
+        topBar = { MainTopBar(onLanguageClick = { showLanguageDialog = true }) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onAddRuleClick,
                 containerColor = IndigoAccent,
                 contentColor = Color.White,
-                icon = { Icon(Icons.Default.Add, contentDescription = "Add rule") },
-                text = { Text("Add Rule", fontWeight = FontWeight.SemiBold) }
+                icon = { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_rule)) },
+                text = { Text(stringResource(R.string.add_rule), fontWeight = FontWeight.SemiBold) }
             )
         }
     ) { padding ->
@@ -265,7 +271,7 @@ fun MainScreen(
             // ── Section header ────────────────────────────────────────────────
             item {
                 SectionHeader(
-                    title = "Intercept Rules",
+                    title = stringResource(R.string.intercept_rules),
                     count = rules.size
                 )
             }
@@ -291,17 +297,58 @@ fun MainScreen(
             onDismissRequest = { showDeleteDialog = null },
             containerColor = NavyCard,
             icon = { Icon(Icons.Default.DeleteForever, tint = ErrorRed, contentDescription = null) },
-            title = { Text("Delete Rule", color = TextPrimary) },
-            text = { Text("Delete \"${rule.ruleName}\"? This cannot be undone.", color = TextSecondary) },
+            title = { Text(stringResource(R.string.delete_rule), color = TextPrimary) },
+            text = { Text(stringResource(R.string.delete_rule_confirmation, rule.ruleName), color = TextSecondary) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteRule(rule)
                     showDeleteDialog = null
-                }) { Text("Delete", color = ErrorRed, fontWeight = FontWeight.Bold) }
+                }) { Text(stringResource(R.string.delete), color = ErrorRed, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = null }) {
-                    Text("Cancel", color = TextSecondary)
+                    Text(stringResource(R.string.cancel), color = TextSecondary)
+                }
+            }
+        )
+    }
+
+    if (showLanguageDialog) {
+        val appLocales = AppCompatDelegate.getApplicationLocales()
+        val selectedLanguage = if (appLocales.isEmpty) "" else appLocales[0]?.language.orEmpty()
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            containerColor = NavyCard,
+            title = { Text(stringResource(R.string.app_language), color = TextPrimary) },
+            text = {
+                Column {
+                    listOf(
+                        "" to R.string.follow_system,
+                        "id" to R.string.language_indonesian,
+                        "en" to R.string.language_english
+                    ).forEach { (tag, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showLanguageDialog = false
+                                    AppCompatDelegate.setApplicationLocales(
+                                        LocaleListCompat.forLanguageTags(tag)
+                                    )
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = selectedLanguage == tag, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(label), color = TextPrimary)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -314,7 +361,7 @@ fun MainScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MainTopBar() {
+private fun MainTopBar(onLanguageClick: () -> Unit) {
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -335,19 +382,28 @@ private fun MainTopBar() {
                     )
                 }
                 Spacer(Modifier.width(12.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Notification Interceptor",
+                        stringResource(R.string.app_name),
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
-                        color = TextPrimary
+                        color = TextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        "Forward notifications via API rules",
+                        stringResource(R.string.main_subtitle),
                         fontSize = 11.sp,
-                        color = TextSecondary
+                        color = TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+            }
+        },
+        actions = {
+            IconButton(onClick = onLanguageClick) {
+                Icon(Icons.Default.Language, contentDescription = stringResource(R.string.language), tint = TextPrimary)
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = NavyDeep)
@@ -377,13 +433,13 @@ private fun BatteryOptimizationBanner(onOpenSettings: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Battery Optimization",
+                    stringResource(R.string.battery_optimization),
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
                     fontSize = 13.sp
                 )
                 Text(
-                    "Disable optimization to prevent the system from killing the listener.",
+                    stringResource(R.string.battery_optimization_message),
                     color = TextSecondary,
                     fontSize = 12.sp
                 )
@@ -393,7 +449,7 @@ private fun BatteryOptimizationBanner(onOpenSettings: () -> Unit) {
                 onClick = onOpenSettings,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
             ) {
-                Text("Settings", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CyanAccent)
+                Text(stringResource(R.string.settings), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CyanAccent)
             }
         }
     }
@@ -426,13 +482,13 @@ private fun ServiceStalledBanner(isRepairing: Boolean, onRepair: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    if (isRepairing) "Repairing listener..." else "Service stalled",
+                    stringResource(if (isRepairing) R.string.repairing_listener else R.string.service_stalled),
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
                     fontSize = 13.sp
                 )
                 Text(
-                    if (isRepairing) "Waiting for system to re-bind..." else "The system disconnected the listener. Tap Repair to restart it.",
+                    stringResource(if (isRepairing) R.string.waiting_for_rebind else R.string.service_stalled_message),
                     color = TextSecondary,
                     fontSize = 12.sp
                 )
@@ -449,7 +505,7 @@ private fun ServiceStalledBanner(isRepairing: Boolean, onRepair: () -> Unit) {
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text(
-                    if (isRepairing) "..." else "Repair",
+                    stringResource(if (isRepairing) R.string.repairing_button else R.string.repair),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
@@ -482,13 +538,13 @@ private fun ListenerPermissionBanner(onOpenSettings: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Listener access required",
+                    stringResource(R.string.listener_access_required),
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
                     fontSize = 13.sp
                 )
                 Text(
-                    "Grant Notification Access so the app can intercept notifications.",
+                    stringResource(R.string.listener_permission_message),
                     color = TextSecondary,
                     fontSize = 12.sp
                 )
@@ -500,7 +556,7 @@ private fun ListenerPermissionBanner(onOpenSettings: () -> Unit) {
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text("Grant", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.grant), fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -524,14 +580,14 @@ private fun TestNotificationCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "🧪  Test Pipeline",
+                    stringResource(R.string.test_pipeline),
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     color = TextPrimary
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    "Posts a local notification using this app's package name.\nAdd a rule targeting \"${LocalContext.current.packageName}\" to intercept it.",
+                    stringResource(R.string.test_pipeline_message, LocalContext.current.packageName),
                     fontSize = 11.sp,
                     color = TextSecondary,
                     lineHeight = 16.sp
@@ -545,7 +601,7 @@ private fun TestNotificationCard(
                     border = androidx.compose.foundation.BorderStroke(1.dp, CyanAccent),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    Text("Allow", color = CyanAccent, fontSize = 12.sp)
+                    Text(stringResource(R.string.allow), color = CyanAccent, fontSize = 12.sp)
                 }
             } else {
                 Button(
@@ -567,7 +623,7 @@ private fun TestNotificationCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text("Send Dummy", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.send_dummy), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -640,10 +696,10 @@ private fun RuleCard(
                     )
                 }
                 IconButton(onClick = onHistoryClick) {
-                    Icon(Icons.Default.History, tint = IndigoLight, contentDescription = "History")
+                    Icon(Icons.Default.History, tint = IndigoLight, contentDescription = stringResource(R.string.history))
                 }
                 IconButton(onClick = onDeleteClick) {
-                    Icon(Icons.Default.Delete, tint = ErrorRed.copy(alpha = 0.7f), contentDescription = "Delete")
+                    Icon(Icons.Default.Delete, tint = ErrorRed.copy(alpha = 0.7f), contentDescription = stringResource(R.string.delete))
                 }
             }
 
@@ -653,12 +709,12 @@ private fun RuleCard(
                     HorizontalDivider(color = Divider)
                     Spacer(Modifier.height(10.dp))
 
-                    DetailRow(label = "Target Apps", value = rule.targetApps.joinToString(", "))
+                    DetailRow(label = stringResource(R.string.target_apps), value = rule.targetApps.joinToString(", "))
 
                     if (rule.customHeaders.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
                         DetailRow(
-                            label = "Headers",
+                            label = stringResource(R.string.headers),
                             value = rule.customHeaders.entries.joinToString("\n") { "${it.key}: ${it.value}" }
                         )
                     }
@@ -689,7 +745,7 @@ private fun RuleCard(
                             color = IndigoAccent.copy(alpha = 0.15f)
                         ) {
                             Text(
-                                "+${rule.targetApps.size - 3}",
+                                stringResource(R.string.more_apps_count, rule.targetApps.size - 3),
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                                 fontSize = 10.sp,
                                 color = IndigoLight
@@ -736,10 +792,10 @@ private fun EmptyRulesPlaceholder() {
             )
         }
         Spacer(Modifier.height(16.dp))
-        Text("No rules yet", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
+        Text(stringResource(R.string.no_rules_yet), fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
         Spacer(Modifier.height(6.dp))
         Text(
-            "Tap  +  Add Rule  to create your first intercept rule.",
+            stringResource(R.string.no_rules_message),
             color = TextSecondary,
             fontSize = 13.sp
         )
