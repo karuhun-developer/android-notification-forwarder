@@ -1,3 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Notification Interceptor</string>
+
+    <!-- Main screen -->
+    <string name="main_subtitle">Forward notifications via API rules</string>
+    <string name="language">Language</string>
+    <string name="app_language">App language</string>
+    <string name="follow_system">Follow system</string>
+    <string name="language_indonesian" translatable="false">Bahasa Indonesia</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="add_rule">Add Rule</string>
+    <string name="intercept_rules">Intercept Rules</string>
+    <string name="delete_rule">Delete Rule</string>
+    <string name="delete_rule_confirmation">Delete \"%1$s\"? This cannot be undone.</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="battery_optimization">Battery Optimization</string>
+    <string name="battery_optimization_message">Disable optimization to prevent the system from killing the listener.</string>
+    <string name="settings">Settings</string>
+    <string name="repairing_listener">Repairing listener…</string>
+    <string name="repairing_button" translatable="false">…</string>
+    <string name="service_stalled">Service stalled</string>
+    <string name="waiting_for_rebind">Waiting for system to re-bind…</string>
+    <string name="service_stalled_message">The system disconnected the listener. Tap Repair to restart it.</string>
+    <string name="repair">Repair</string>
+    <string name="listener_access_required">Listener access required</string>
+    <string name="listener_permission_message">Grant Notification Access so the app can intercept notifications.</string>
+    <string name="grant">Grant</string>
+    <string name="test_pipeline">🧪  Test Pipeline</string>
+    <string name="test_pipeline_message">Posts a local notification using this app\'s package name.\nAdd a rule targeting \"%1$s\" to intercept it.</string>
+    <string name="allow">Allow</string>
+    <string name="send_dummy">Send Dummy</string>
+    <string name="history">History</string>
+    <string name="target_apps">Target Apps</string>
+    <string name="headers">Headers</string>
+    <string name="more_apps_count">+%1$d</string>
+    <string name="no_rules_yet">No rules yet</string>
+    <string name="no_rules_message">Tap  +  Add Rule  to create your first intercept rule.</string>
+    <string name="test_notification_channel">Test Notifications</string>
+    <string name="test_notification_channel_description">Channel for dummy test notifications</string>
+    <string name="test_notification_title">Test Notification</string>
+    <string name="test_notification_body">This is a dummy notification for testing rules.</string>
+
+    <!-- Rule form and app picker -->
+    <string name="new_rule">New Rule</string>
+    <string name="configure_forwarding_rule">Configure a forwarding rule</string>
+    <string name="back">Back</string>
+    <string name="save">Save</string>
+    <string name="identification">Identification</string>
+    <string name="rule_name">Rule Name</string>
+    <string name="rule_name_placeholder">e.g. WhatsApp → Slack webhook</string>
+    <string name="rule_name_required">Rule name is required</string>
+    <string name="target_apps_required">At least one app must be selected</string>
+    <string name="api_url_required">API URL is required</string>
+    <string name="api_url_invalid_scheme">URL must start with http:// or https://</string>
+    <string name="headers_invalid_json">Invalid JSON — must be a flat {\"key\": \"value\"} object</string>
+    <string name="test_pipeline_tip">💡  To test the pipeline, select this app and use the Send Dummy button.</string>
+    <string name="api_endpoint">API Endpoint</string>
+    <string name="api_url">API URL</string>
+    <string name="api_url_placeholder" translatable="false">https://hooks.slack.com/services/…</string>
+    <string name="http_method">HTTP METHOD</string>
+    <string name="delivery">Delivery</string>
+    <string name="automatic_retry">Automatic retry</string>
+    <string name="automatic_retry_hint">Enable only when the endpoint deduplicates X-Delivery-Id. Network errors and HTTP 408/429/5xx retry up to 10 attempts.</string>
+    <string name="custom_headers">Custom Headers</string>
+    <string name="headers_json_optional">Headers JSON (optional)</string>
+    <string name="headers_json_placeholder" translatable="false">{\n  \"Authorization\": \"Bearer token\",\n  \"X-Source\": \"android\"\n}</string>
+    <string name="valid_json">Valid JSON</string>
+    <string name="select_target_apps_hint">Tap to select target apps…</string>
+    <string name="remove">Remove</string>
+    <string name="select_target_apps">Select Target Apps</string>
+    <string name="search_apps">Search apps…</string>
+    <string name="clear">Clear</string>
+    <string name="no_apps_found">No apps found</string>
+    <string name="done">Done</string>
+
+    <!-- History and delivery status -->
+    <string name="clear_legacy_history">Clear legacy history</string>
+    <string name="auto_retry_future_notifications">Auto-retry future notifications</string>
+    <string name="auto_retry_future_hint">Enable only when the receiver deduplicates X-Delivery-Id. Existing deliveries keep their captured setting.</string>
+    <string name="deliveries">Deliveries</string>
+    <string name="legacy_history_note">Legacy history · clear removes these entries only</string>
+    <string name="success">Success</string>
+    <string name="failed">Failed</string>
+    <string name="notification_label">Notification:</string>
+    <string name="app_notification_title">%1$s: %2$s</string>
+    <string name="error_with_detail">Error: %1$s</string>
+    <string name="status_with_code">Status %1$d</string>
+    <string name="status_unknown">Status unknown</string>
+    <string name="http_status">HTTP %1$d</string>
+    <string name="no_history_for_rule">No history for this rule</string>
+    <string name="status_queued">Queued</string>
+    <string name="status_sending">Sending</string>
+    <string name="status_retrying">Waiting to retry</string>
+    <string name="status_delivered">Delivered</string>
+    <string name="status_failed_review">Failed / review required</string>
+    <string name="status_cancelled">Cancelled</string>
+    <string name="attempts_auto_retry">Attempts: %1$d · Auto-retry: %2$s</string>
+    <string name="on">on</string>
+    <string name="off">off</string>
+    <string name="check_receiver_before_retry">Check the receiver before retrying an unknown outcome.</string>
+    <string name="retry_delivery">Retry delivery</string>
 </resources>

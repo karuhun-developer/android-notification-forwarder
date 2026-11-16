@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -37,6 +39,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import com.google.gson.reflect.TypeToken
+import com.karuhundeveloper.notification.R
 import com.karuhundeveloper.notification.data.local.entity.InterceptRule
 import com.karuhundeveloper.notification.ui.component.MethodBadge
 import com.karuhundeveloper.notification.ui.theme.*
@@ -53,6 +56,7 @@ fun AddRuleScreen(
     viewModel: RulesViewModel = viewModel(),
     appPickerViewModel: AppPickerViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     // ── Form state ────────────────────────────────────────────────────────────
     var ruleName by remember { mutableStateOf("") }
     var selectedApps by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -82,16 +86,16 @@ fun AddRuleScreen(
     fun validate(): Boolean {
         var ok = true
 
-        ruleNameError = if (ruleName.isBlank()) { ok = false; "Rule name is required" } else null
+        ruleNameError = if (ruleName.isBlank()) { ok = false; context.getString(R.string.rule_name_required) } else null
 
         targetAppsError = if (selectedApps.isEmpty()) {
-            ok = false; "At least one app must be selected"
+            ok = false; context.getString(R.string.target_apps_required)
         } else null
 
         apiUrlError = when {
-            apiUrl.isBlank() -> { ok = false; "API URL is required" }
+            apiUrl.isBlank() -> { ok = false; context.getString(R.string.api_url_required) }
             !apiUrl.startsWith("http://") && !apiUrl.startsWith("https://") ->
-                { ok = false; "URL must start with http:// or https://" }
+                { ok = false; context.getString(R.string.api_url_invalid_scheme) }
             else -> null
         }
 
@@ -101,7 +105,7 @@ fun AddRuleScreen(
                 gson.fromJson<Map<String, String>>(customHeaders, type)
                 null
             } catch (e: JsonSyntaxException) {
-                ok = false; "Invalid JSON — must be a flat {\"key\": \"value\"} object"
+                ok = false; context.getString(R.string.headers_invalid_json)
             }
         } else null
 
@@ -138,13 +142,13 @@ fun AddRuleScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("New Rule", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
-                        Text("Configure a forwarding rule", fontSize = 11.sp, color = TextSecondary)
+                        Text(stringResource(R.string.new_rule), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
+                        Text(stringResource(R.string.configure_forwarding_rule), fontSize = 11.sp, color = TextSecondary)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back), tint = TextPrimary)
                     }
                 },
                 actions = {
@@ -160,7 +164,7 @@ fun AddRuleScreen(
                         ) {
                             Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.save), color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 },
@@ -177,19 +181,19 @@ fun AddRuleScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // ── Identification ────────────────────────────────────────────────
-            FormSection(title = "Identification", icon = Icons.Default.Label) {
+            FormSection(title = stringResource(R.string.identification), icon = Icons.Default.Label) {
                 RuleTextField(
                     value = ruleName,
                     onValueChange = { ruleName = it; ruleNameError = null },
-                    label = "Rule Name",
-                    placeholder = "e.g. WhatsApp → Slack webhook",
+                    label = stringResource(R.string.rule_name),
+                    placeholder = stringResource(R.string.rule_name_placeholder),
                     error = ruleNameError,
                     imeAction = ImeAction.Next
                 )
             }
 
             // ── Target Apps ───────────────────────────────────────────────────
-            FormSection(title = "Target Apps", icon = Icons.Default.Apps) {
+            FormSection(title = stringResource(R.string.target_apps), icon = Icons.Default.Apps) {
                 AppSelector(
                     selectedApps = selectedApps,
                     onOpenPicker = { showAppPicker = true },
@@ -212,7 +216,7 @@ fun AddRuleScreen(
 
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "💡  To test the pipeline, select this app and use the Send Dummy button.",
+                    stringResource(R.string.test_pipeline_tip),
                     fontSize = 11.sp,
                     color = TextSecondary,
                     lineHeight = 16.sp
@@ -220,12 +224,12 @@ fun AddRuleScreen(
             }
 
             // ── Endpoint ──────────────────────────────────────────────────────
-            FormSection(title = "API Endpoint", icon = Icons.Default.Link) {
+            FormSection(title = stringResource(R.string.api_endpoint), icon = Icons.Default.Link) {
                 RuleTextField(
                     value = apiUrl,
                     onValueChange = { apiUrl = it; apiUrlError = null },
-                    label = "API URL",
-                    placeholder = "https://hooks.slack.com/services/…",
+                    label = stringResource(R.string.api_url),
+                    placeholder = stringResource(R.string.api_url_placeholder),
                     error = apiUrlError,
                     keyboardType = KeyboardType.Uri,
                     imeAction = ImeAction.Next,
@@ -236,7 +240,7 @@ fun AddRuleScreen(
 
                 // Method dropdown
                 Text(
-                    "HTTP METHOD",
+                    stringResource(R.string.http_method),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = IndigoLight,
@@ -287,21 +291,21 @@ fun AddRuleScreen(
                 }
             }
 
-            FormSection(title = "Delivery", icon = Icons.Default.Refresh) {
+            FormSection(title = stringResource(R.string.delivery), icon = Icons.Default.Refresh) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Automatic retry", modifier = Modifier.weight(1f), color = TextPrimary)
+                    Text(stringResource(R.string.automatic_retry), modifier = Modifier.weight(1f), color = TextPrimary)
                     Switch(checked = autoRetry, onCheckedChange = { autoRetry = it })
                 }
-                Text("Enable only when the endpoint deduplicates X-Delivery-Id. Network errors and HTTP 408/429/5xx retry up to 10 attempts.", color = TextSecondary, fontSize = 12.sp)
+                Text(stringResource(R.string.automatic_retry_hint), color = TextSecondary, fontSize = 12.sp)
             }
 
             // ── Custom Headers ────────────────────────────────────────────────
-            FormSection(title = "Custom Headers", icon = Icons.Default.Code) {
+            FormSection(title = stringResource(R.string.custom_headers), icon = Icons.Default.Code) {
                 RuleTextField(
                     value = customHeaders,
                     onValueChange = { customHeaders = it; headersError = null },
-                    label = "Headers JSON (optional)",
-                    placeholder = "{\n  \"Authorization\": \"Bearer token\",\n  \"X-Source\": \"android\"\n}",
+                    label = stringResource(R.string.headers_json_optional),
+                    placeholder = stringResource(R.string.headers_json_placeholder),
                     error = headersError,
                     minLines = 4,
                     imeAction = ImeAction.Default,
@@ -323,7 +327,7 @@ fun AddRuleScreen(
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("Valid JSON", fontSize = 11.sp, color = SuccessGreen)
+                        Text(stringResource(R.string.valid_json), fontSize = 11.sp, color = SuccessGreen)
                     }
                 }
             }
@@ -371,7 +375,7 @@ private fun FormSection(
                 Icon(icon, contentDescription = null, tint = IndigoAccent, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    title.uppercase(),
+                    title.uppercase(LocalConfiguration.current.locales[0]),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = IndigoLight,
@@ -467,7 +471,7 @@ private fun AppSelector(
     ) {
         if (selectedApps.isEmpty()) {
             Text(
-                "Tap to select target apps...",
+                stringResource(R.string.select_target_apps_hint),
                 color = TextSecondary.copy(alpha = 0.6f),
                 fontSize = 14.sp
             )
@@ -490,7 +494,7 @@ private fun AppSelector(
                         trailingIcon = {
                             Icon(
                                 Icons.Default.Close,
-                                contentDescription = "Remove",
+                                contentDescription = stringResource(R.string.remove),
                                 modifier = Modifier.size(14.dp),
                                 tint = TextSecondary
                             )
@@ -547,7 +551,7 @@ private fun AppPickerDialog(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "Select Target Apps",
+                        stringResource(R.string.select_target_apps),
                         style = MaterialTheme.typography.titleLarge,
                         color = TextPrimary,
                         modifier = Modifier.padding(bottom = 16.dp)
@@ -557,12 +561,12 @@ private fun AppPickerDialog(
                         value = searchQuery,
                         onValueChange = onSearchQueryChange,
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Search apps...", color = TextSecondary) },
+                        placeholder = { Text(stringResource(R.string.search_apps), color = TextSecondary) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = IndigoLight) },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
                                 IconButton(onClick = { onSearchQueryChange("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextSecondary)
+                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.clear), tint = TextSecondary)
                                 }
                             }
                         },
@@ -579,7 +583,7 @@ private fun AppPickerDialog(
                         }
                     } else if (filteredApps.isEmpty()) {
                         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text("No apps found", color = TextSecondary)
+                            Text(stringResource(R.string.no_apps_found), color = TextSecondary)
                         }
                     } else {
                         LazyColumn(
@@ -635,7 +639,7 @@ private fun AppPickerDialog(
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(onClick = onDismiss) {
-                            Text("Done", color = IndigoAccent, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.done), color = IndigoAccent, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
