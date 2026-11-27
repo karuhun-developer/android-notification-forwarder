@@ -1,39 +1,65 @@
 package com.karuhundeveloper.notification.ui.screen
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.gson.Gson
@@ -41,15 +67,24 @@ import com.google.gson.JsonSyntaxException
 import com.google.gson.reflect.TypeToken
 import com.karuhundeveloper.notification.R
 import com.karuhundeveloper.notification.data.local.entity.InterceptRule
-import com.karuhundeveloper.notification.ui.component.MethodBadge
-import com.karuhundeveloper.notification.ui.theme.*
+import com.karuhundeveloper.notification.ui.component.AppIcon
+import com.karuhundeveloper.notification.ui.component.EmptyState
+import com.karuhundeveloper.notification.ui.component.InlineNotice
+import com.karuhundeveloper.notification.ui.component.LoadingBlock
+import com.karuhundeveloper.notification.ui.component.NoticeTone
+import com.karuhundeveloper.notification.ui.component.PrimaryBar
+import com.karuhundeveloper.notification.ui.component.ScreenHeader
+import com.karuhundeveloper.notification.ui.component.SectionLabel
+import com.karuhundeveloper.notification.ui.theme.RelayMonoSmall
+import com.karuhundeveloper.notification.ui.theme.RelayShapes
+import com.karuhundeveloper.notification.ui.theme.RelayTheme
+import com.karuhundeveloper.notification.ui.viewmodel.AppInfoItem
 import com.karuhundeveloper.notification.ui.viewmodel.AppPickerViewModel
 import com.karuhundeveloper.notification.ui.viewmodel.RulesViewModel
 
 private val HTTP_METHODS = listOf("POST", "GET", "PUT", "PATCH", "DELETE")
 private val gson = Gson()
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddRuleScreen(
     onNavigateBack: () -> Unit,
@@ -57,7 +92,8 @@ fun AddRuleScreen(
     appPickerViewModel: AppPickerViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    // ── Form state ────────────────────────────────────────────────────────────
+    val colors = RelayTheme.colors
+
     var ruleName by remember { mutableStateOf("") }
     var selectedApps by remember { mutableStateOf<Set<String>>(emptySet()) }
     var apiUrl by remember { mutableStateOf("") }
@@ -65,37 +101,49 @@ fun AddRuleScreen(
     var autoRetry by remember { mutableStateOf(false) }
     var customHeaders by remember { mutableStateOf("") }
 
-    // ── App Picker state ──────────────────────────────────────────────────────
     val allApps by appPickerViewModel.installedApps.collectAsStateWithLifecycle()
     val isAppsLoading by appPickerViewModel.isLoading.collectAsStateWithLifecycle()
+    val appsError by appPickerViewModel.error.collectAsStateWithLifecycle()
     var appSearchQuery by remember { mutableStateOf("") }
     var showAppPicker by remember { mutableStateOf(false) }
 
-    // ── Validation error state ────────────────────────────────────────────────
     var ruleNameError by remember { mutableStateOf<String?>(null) }
     var targetAppsError by remember { mutableStateOf<String?>(null) }
     var apiUrlError by remember { mutableStateOf<String?>(null) }
     var headersError by remember { mutableStateOf<String?>(null) }
 
-    // ── Method dropdown ───────────────────────────────────────────────────────
-    var methodDropdownExpanded by remember { mutableStateOf(false) }
-
-    // ── Snackbar ──────────────────────────────────────────────────────────────
-    val snackbarHostState = remember { SnackbarHostState() }
+    val appLabels = remember(allApps) {
+        allApps.associate { it.packageName to it.name }
+    }
 
     fun validate(): Boolean {
         var ok = true
 
-        ruleNameError = if (ruleName.isBlank()) { ok = false; context.getString(R.string.rule_name_required) } else null
+        ruleNameError = if (ruleName.isBlank()) {
+            ok = false
+            context.getString(R.string.rule_name_required)
+        } else {
+            null
+        }
 
         targetAppsError = if (selectedApps.isEmpty()) {
-            ok = false; context.getString(R.string.target_apps_required)
-        } else null
+            ok = false
+            context.getString(R.string.sources_required)
+        } else {
+            null
+        }
 
         apiUrlError = when {
-            apiUrl.isBlank() -> { ok = false; context.getString(R.string.api_url_required) }
-            !apiUrl.startsWith("http://") && !apiUrl.startsWith("https://") ->
-                { ok = false; context.getString(R.string.api_url_invalid_scheme) }
+            apiUrl.isBlank() -> {
+                ok = false
+                context.getString(R.string.api_url_required)
+            }
+
+            !apiUrl.startsWith("http://") && !apiUrl.startsWith("https://") -> {
+                ok = false
+                context.getString(R.string.api_url_invalid_scheme)
+            }
+
             else -> null
         }
 
@@ -105,9 +153,12 @@ fun AddRuleScreen(
                 gson.fromJson<Map<String, String>>(customHeaders, type)
                 null
             } catch (e: JsonSyntaxException) {
-                ok = false; context.getString(R.string.headers_invalid_json)
+                ok = false
+                context.getString(R.string.headers_invalid_json)
             }
-        } else null
+        } else {
+            null
+        }
 
         return ok
     }
@@ -136,39 +187,18 @@ fun AddRuleScreen(
     }
 
     Scaffold(
-        containerColor = NavyDeep,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = colors.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(stringResource(R.string.new_rule), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
-                        Text(stringResource(R.string.configure_forwarding_rule), fontSize = 11.sp, color = TextSecondary)
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back), tint = TextPrimary)
-                    }
-                },
-                actions = {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 12.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Brush.linearGradient(listOf(IndigoAccent, CyanAccent)))
-                    ) {
-                        TextButton(
-                            onClick = { onSave() },
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                        ) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.save), color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = NavyDeep)
+            ScreenHeader(
+                title = stringResource(R.string.new_rule),
+                subtitle = stringResource(R.string.configure_forwarding_rule),
+                onBack = onNavigateBack
+            )
+        },
+        bottomBar = {
+            PrimaryBar(
+                label = stringResource(R.string.save_rule),
+                onClick = { onSave() }
             )
         }
     ) { padding ->
@@ -177,160 +207,91 @@ fun AddRuleScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 16.dp)
         ) {
-            // ── Identification ────────────────────────────────────────────────
-            FormSection(title = stringResource(R.string.identification), icon = Icons.Default.Label) {
-                RuleTextField(
-                    value = ruleName,
-                    onValueChange = { ruleName = it; ruleNameError = null },
-                    label = stringResource(R.string.rule_name),
-                    placeholder = stringResource(R.string.rule_name_placeholder),
-                    error = ruleNameError,
-                    imeAction = ImeAction.Next
-                )
-            }
+            Spacer(Modifier.height(8.dp))
 
-            // ── Target Apps ───────────────────────────────────────────────────
-            FormSection(title = stringResource(R.string.target_apps), icon = Icons.Default.Apps) {
-                AppSelector(
-                    selectedApps = selectedApps,
-                    onOpenPicker = { showAppPicker = true },
-                    onRemoveApp = { pkg -> selectedApps = selectedApps - pkg },
-                    isError = targetAppsError != null
-                )
+            FieldLabel(stringResource(R.string.rule_name))
+            Spacer(Modifier.height(6.dp))
+            RelayTextField(
+                value = ruleName,
+                onValueChange = {
+                    ruleName = it
+                    ruleNameError = null
+                },
+                placeholder = stringResource(R.string.rule_name_placeholder),
+                error = ruleNameError,
+                imeAction = ImeAction.Next
+            )
 
-                AnimatedVisibility(visible = targetAppsError != null, enter = fadeIn() + expandVertically()) {
-                    targetAppsError?.let {
-                        Row(
-                            modifier = Modifier.padding(start = 4.dp, top = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Warning, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(13.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(it, fontSize = 11.sp, color = ErrorRed)
-                        }
-                    }
-                }
+            Spacer(Modifier.height(28.dp))
+            SectionLabel(text = stringResource(R.string.sources))
+            Spacer(Modifier.height(12.dp))
+            SourceSelector(
+                selectedApps = selectedApps,
+                labelFor = { packageName -> appLabels[packageName] ?: packageName.substringAfterLast('.') },
+                onOpenPicker = { showAppPicker = true },
+                onRemoveApp = { packageName -> selectedApps = selectedApps - packageName },
+                error = targetAppsError
+            )
 
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(R.string.test_pipeline_tip),
-                    fontSize = 11.sp,
-                    color = TextSecondary,
-                    lineHeight = 16.sp
-                )
-            }
+            Spacer(Modifier.height(28.dp))
+            SectionLabel(text = stringResource(R.string.destination))
+            Spacer(Modifier.height(12.dp))
 
-            // ── Endpoint ──────────────────────────────────────────────────────
-            FormSection(title = stringResource(R.string.api_endpoint), icon = Icons.Default.Link) {
-                RuleTextField(
-                    value = apiUrl,
-                    onValueChange = { apiUrl = it; apiUrlError = null },
-                    label = stringResource(R.string.api_url),
-                    placeholder = stringResource(R.string.api_url_placeholder),
-                    error = apiUrlError,
-                    keyboardType = KeyboardType.Uri,
-                    imeAction = ImeAction.Next,
-                    capitalization = KeyboardCapitalization.None
-                )
+            FieldLabel(stringResource(R.string.method))
+            Spacer(Modifier.height(6.dp))
+            MethodSelector(
+                selected = selectedMethod,
+                onSelect = { selectedMethod = it }
+            )
 
-                Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
+            FieldLabel(stringResource(R.string.endpoint_url))
+            Spacer(Modifier.height(6.dp))
+            RelayTextField(
+                value = apiUrl,
+                onValueChange = {
+                    apiUrl = it
+                    apiUrlError = null
+                },
+                placeholder = stringResource(R.string.api_url_placeholder),
+                error = apiUrlError,
+                keyboardType = KeyboardType.Uri,
+                imeAction = ImeAction.Next,
+                capitalization = KeyboardCapitalization.None
+            )
 
-                // Method dropdown
-                Text(
-                    stringResource(R.string.http_method),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = IndigoLight,
-                    letterSpacing = 0.8.sp
-                )
-                Spacer(Modifier.height(4.dp))
-                ExposedDropdownMenuBox(
-                    expanded = methodDropdownExpanded,
-                    onExpandedChange = { methodDropdownExpanded = it }
-                ) {
-                    OutlinedTextField(
-                        value = selectedMethod,
-                        onValueChange = {},
-                        readOnly = true,
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = methodDropdownExpanded)
-                        },
-                        leadingIcon = {
-                            MethodBadge(method = selectedMethod)
-                        },
-                        modifier = Modifier
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                            .fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ruleTextFieldColors()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = methodDropdownExpanded,
-                        onDismissRequest = { methodDropdownExpanded = false },
-                        containerColor = NavyElevated
-                    ) {
-                        HTTP_METHODS.forEach { method ->
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        MethodBadge(method = method)
-                                        Spacer(Modifier.width(10.dp))
-                                        Text(method, color = TextPrimary)
-                                    }
-                                },
-                                onClick = {
-                                    selectedMethod = method
-                                    methodDropdownExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-            }
+            Spacer(Modifier.height(28.dp))
+            SectionLabel(text = stringResource(R.string.delivery))
+            Spacer(Modifier.height(12.dp))
+            RetryRow(
+                autoRetry = autoRetry,
+                onCheckedChange = { autoRetry = it }
+            )
 
-            FormSection(title = stringResource(R.string.delivery), icon = Icons.Default.Refresh) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.automatic_retry), modifier = Modifier.weight(1f), color = TextPrimary)
-                    Switch(checked = autoRetry, onCheckedChange = { autoRetry = it })
-                }
-                Text(stringResource(R.string.automatic_retry_hint), color = TextSecondary, fontSize = 12.sp)
-            }
-
-            // ── Custom Headers ────────────────────────────────────────────────
-            FormSection(title = stringResource(R.string.custom_headers), icon = Icons.Default.Code) {
-                RuleTextField(
-                    value = customHeaders,
-                    onValueChange = { customHeaders = it; headersError = null },
-                    label = stringResource(R.string.headers_json_optional),
-                    placeholder = stringResource(R.string.headers_json_placeholder),
-                    error = headersError,
-                    minLines = 4,
-                    imeAction = ImeAction.Default,
-                    keyboardType = KeyboardType.Ascii,
-                    capitalization = KeyboardCapitalization.None
-                )
-                AnimatedVisibility(
-                    visible = headersError == null && customHeaders.isNotBlank(),
-                    enter = fadeIn() + expandVertically()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(top = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = SuccessGreen,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.valid_json), fontSize = 11.sp, color = SuccessGreen)
-                    }
-                }
-            }
+            Spacer(Modifier.height(28.dp))
+            SectionLabel(text = stringResource(R.string.headers))
+            Spacer(Modifier.height(12.dp))
+            RelayTextField(
+                value = customHeaders,
+                onValueChange = {
+                    customHeaders = it
+                    headersError = null
+                },
+                placeholder = stringResource(R.string.headers_json_placeholder),
+                error = headersError,
+                minLines = 4,
+                keyboardType = KeyboardType.Ascii,
+                imeAction = ImeAction.Default,
+                capitalization = KeyboardCapitalization.None
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.headers_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.inkMuted
+            )
 
             Spacer(Modifier.height(32.dp))
         }
@@ -340,13 +301,19 @@ fun AddRuleScreen(
         AppPickerDialog(
             allApps = allApps,
             isLoading = isAppsLoading,
+            error = appsError,
             selectedApps = selectedApps,
             searchQuery = appSearchQuery,
             onSearchQueryChange = { appSearchQuery = it },
-            onToggleApp = { pkg ->
-                selectedApps = if (pkg in selectedApps) selectedApps - pkg else selectedApps + pkg
+            onToggleApp = { packageName ->
+                selectedApps = if (packageName in selectedApps) {
+                    selectedApps - packageName
+                } else {
+                    selectedApps + packageName
+                }
                 targetAppsError = null
             },
+            onRetry = appPickerViewModel::refresh,
             onDismiss = {
                 showAppPicker = false
                 appSearchQuery = ""
@@ -355,162 +322,107 @@ fun AddRuleScreen(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared form sub-components
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
-private fun FormSection(
-    title: String,
-    icon: ImageVector,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = NavyCard)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, tint = IndigoAccent, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    title.uppercase(LocalConfiguration.current.locales[0]),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = IndigoLight,
-                    letterSpacing = 0.8.sp
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-            content()
-        }
-    }
+private fun FieldLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = RelayTheme.colors.ink
+    )
 }
 
 @Composable
-private fun ruleTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor       = TextPrimary,
-    unfocusedTextColor     = TextPrimary,
-    focusedBorderColor     = IndigoAccent,
-    unfocusedBorderColor   = Divider,
-    focusedLabelColor      = IndigoLight,
-    unfocusedLabelColor    = TextSecondary,
-    cursorColor            = IndigoAccent,
-    focusedContainerColor  = NavyElevated,
-    unfocusedContainerColor= NavyElevated,
-    errorBorderColor       = ErrorRed,
-    errorLabelColor        = ErrorRed,
-    errorTextColor         = TextPrimary
-)
-
-@Composable
-private fun RuleTextField(
+private fun RelayTextField(
     value: String,
     onValueChange: (String) -> Unit,
-    label: String,
-    placeholder: String = "",
+    placeholder: String,
     error: String? = null,
     minLines: Int = 1,
     keyboardType: KeyboardType = KeyboardType.Text,
     imeAction: ImeAction = ImeAction.Next,
     capitalization: KeyboardCapitalization = KeyboardCapitalization.Sentences,
+    modifier: Modifier = Modifier
 ) {
-    Column {
+    val colors = RelayTheme.colors
+
+    Column(modifier) {
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            label = { Text(label) },
-            placeholder = { Text(placeholder, color = TextSecondary.copy(alpha = 0.5f), fontSize = 12.sp) },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = {
+                Text(
+                    text = placeholder,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.inkMuted.copy(alpha = 0.7f)
+                )
+            },
             isError = error != null,
             minLines = minLines,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = ruleTextFieldColors(),
+            singleLine = minLines == 1,
+            shape = RelayShapes.small,
+            textStyle = MaterialTheme.typography.bodyLarge,
             keyboardOptions = KeyboardOptions(
                 keyboardType = keyboardType,
                 imeAction = imeAction,
                 capitalization = capitalization
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = colors.ink,
+                unfocusedTextColor = colors.ink,
+                focusedContainerColor = colors.surface,
+                unfocusedContainerColor = colors.surface,
+                focusedBorderColor = colors.ink,
+                unfocusedBorderColor = colors.hairline,
+                cursorColor = colors.ink,
+                errorBorderColor = colors.error,
+                errorContainerColor = colors.surface,
+                errorTextColor = colors.ink,
+                focusedPlaceholderColor = colors.inkMuted.copy(alpha = 0.7f),
+                unfocusedPlaceholderColor = colors.inkMuted.copy(alpha = 0.7f)
             )
         )
-        AnimatedVisibility(visible = error != null, enter = fadeIn() + expandVertically()) {
-            error?.let {
-                Row(
-                    modifier = Modifier.padding(start = 4.dp, top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Warning, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(13.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(it, fontSize = 11.sp, color = ErrorRed)
-                }
-            }
+        if (error != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.error
+            )
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AppSelector(
-    selectedApps: Set<String>,
-    onOpenPicker: () -> Unit,
-    onRemoveApp: (String) -> Unit,
-    isError: Boolean
+private fun MethodSelector(
+    selected: String,
+    onSelect: (String) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(NavyElevated)
-            .border(
-                width = 1.dp,
-                color = if (isError) ErrorRed else Divider,
-                shape = RoundedCornerShape(12.dp)
-            )
-            .clickable { onOpenPicker() }
-            .padding(12.dp)
+    val colors = RelayTheme.colors
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (selectedApps.isEmpty()) {
-            Text(
-                stringResource(R.string.select_target_apps_hint),
-                color = TextSecondary.copy(alpha = 0.6f),
-                fontSize = 14.sp
-            )
-        } else {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+        HTTP_METHODS.forEach { method ->
+            val isSelected = method == selected
+            Surface(
+                onClick = { onSelect(method) },
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 44.dp),
+                shape = RelayShapes.extraSmall,
+                color = if (isSelected) colors.ink else colors.surface,
+                border = if (isSelected) null else BorderStroke(1.dp, colors.hairline)
             ) {
-                selectedApps.forEach { pkg ->
-                    InputChip(
-                        selected = true,
-                        onClick = { onRemoveApp(pkg) },
-                        label = {
-                            Text(
-                                pkg.substringAfterLast('.'),
-                                fontSize = 12.sp,
-                                color = TextPrimary
-                            )
-                        },
-                        trailingIcon = {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = stringResource(R.string.remove),
-                                modifier = Modifier.size(14.dp),
-                                tint = TextSecondary
-                            )
-                        },
-                        colors = InputChipDefaults.inputChipColors(
-                            containerColor = NavyDeep,
-                            labelColor = TextPrimary
-                        ),
-                        border = InputChipDefaults.inputChipBorder(
-                            selected = true,
-                            enabled = true,
-                            borderColor = Divider,
-                            borderWidth = 1.dp,
-                            selectedBorderColor = IndigoAccent,
-                            selectedBorderWidth = 1.dp
-                        )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = method,
+                        style = RelayMonoSmall,
+                        color = if (isSelected) colors.background else colors.inkMuted
                     )
                 }
             }
@@ -518,132 +430,389 @@ private fun AppSelector(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SourceSelector(
+    selectedApps: Set<String>,
+    labelFor: (String) -> String,
+    onOpenPicker: () -> Unit,
+    onRemoveApp: (String) -> Unit,
+    error: String?
+) {
+    val colors = RelayTheme.colors
+    val borderColor = if (error != null) colors.error else colors.hairline
+
+    Column {
+        if (selectedApps.isEmpty()) {
+            Surface(
+                onClick = onOpenPicker,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp),
+                shape = RelayShapes.small,
+                color = colors.surface,
+                border = BorderStroke(1.dp, borderColor)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = colors.inkMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.select_target_apps_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.inkMuted
+                    )
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RelayShapes.small)
+                    .border(1.dp, borderColor, RelayShapes.small)
+            ) {
+                selectedApps.forEachIndexed { index, packageName ->
+                    if (index > 0) HorizontalDivider(color = colors.hairline)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 56.dp)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AppIcon(
+                            packageName = packageName,
+                            label = labelFor(packageName),
+                            size = 30.dp
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = labelFor(packageName),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.ink,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = packageName,
+                                style = RelayMonoSmall,
+                                color = colors.inkMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        IconButton(
+                            onClick = { onRemoveApp(packageName) },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.remove),
+                                tint = colors.inkMuted,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+                HorizontalDivider(color = colors.hairline)
+                Surface(
+                    onClick = onOpenPicker,
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = colors.inkMuted,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.add_apps),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = colors.ink
+                        )
+                    }
+                }
+            }
+        }
+
+        if (error != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.error
+            )
+        }
+    }
+}
+
+@Composable
+private fun RetryRow(
+    autoRetry: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    val colors = RelayTheme.colors
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.automatic_retry),
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.ink
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = stringResource(R.string.automatic_retry_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.inkMuted
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(
+            checked = autoRetry,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = colors.background,
+                checkedTrackColor = colors.ink,
+                checkedBorderColor = colors.ink,
+                uncheckedThumbColor = colors.inkMuted,
+                uncheckedTrackColor = colors.surfaceRaised,
+                uncheckedBorderColor = colors.hairline
+            )
+        )
+    }
+}
+
 @Composable
 private fun AppPickerDialog(
-    allApps: List<com.karuhundeveloper.notification.ui.viewmodel.AppInfoItem>,
+    allApps: List<AppInfoItem>,
     isLoading: Boolean,
+    error: String?,
     selectedApps: Set<String>,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onToggleApp: (String) -> Unit,
+    onRetry: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val colors = RelayTheme.colors
     val filteredApps = remember(allApps, searchQuery) {
-        if (searchQuery.isBlank()) allApps
-        else allApps.filter {
-            it.name.contains(searchQuery, ignoreCase = true) ||
+        if (searchQuery.isBlank()) {
+            allApps
+        } else {
+            allApps.filter {
+                it.name.contains(searchQuery, ignoreCase = true) ||
                     it.packageName.contains(searchQuery, ignoreCase = true)
+            }
         }
     }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-        modifier = Modifier
-            .fillMaxWidth(0.95f)
-            .fillMaxHeight(0.8f),
-        content = {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = NavyCard,
-                tonalElevation = 6.dp
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            shape = RelayShapes.medium,
+            color = colors.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        stringResource(R.string.select_target_apps),
+                        text = stringResource(R.string.select_target_apps),
                         style = MaterialTheme.typography.titleLarge,
-                        color = TextPrimary,
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        color = colors.ink,
+                        modifier = Modifier.weight(1f)
                     )
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.cancel),
+                            tint = colors.ink
+                        )
+                    }
+                }
 
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text(stringResource(R.string.search_apps), color = TextSecondary) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = IndigoLight) },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { onSearchQueryChange("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.clear), tint = TextSecondary)
-                                }
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ruleTextFieldColors(),
-                        singleLine = true
-                    )
+                Spacer(Modifier.height(8.dp))
+                RelayTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    placeholder = stringResource(R.string.search_apps),
+                    imeAction = ImeAction.Search,
+                    capitalization = KeyboardCapitalization.None
+                )
+                Spacer(Modifier.height(12.dp))
 
-                    Spacer(Modifier.height(16.dp))
-
-                    if (isLoading && allApps.isEmpty()) {
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = IndigoAccent)
-                        }
-                    } else if (filteredApps.isEmpty()) {
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text(stringResource(R.string.no_apps_found), color = TextSecondary)
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                when {
+                    isLoading && allApps.isEmpty() -> {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
                         ) {
-                            items(filteredApps, key = { it.packageName }) { app ->
-                                val isSelected = app.packageName in selectedApps
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isSelected) IndigoAccent.copy(alpha = 0.15f) else Color.Transparent)
-                                        .clickable { onToggleApp(app.packageName) }
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(NavyElevated),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            app.name.firstOrNull()?.toString() ?: "?",
-                                            color = IndigoLight,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    Spacer(Modifier.width(12.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(app.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                        Text(app.packageName, color = TextSecondary, fontSize = 11.sp)
-                                    }
-                                    Checkbox(
-                                        checked = isSelected,
-                                        onCheckedChange = { onToggleApp(app.packageName) },
-                                        colors = CheckboxDefaults.colors(
-                                            checkedColor = IndigoAccent,
-                                            uncheckedColor = Divider
-                                        )
-                                    )
-                                }
-                            }
+                            LoadingBlock(label = stringResource(R.string.loading_apps))
                         }
                     }
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 16.dp),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = onDismiss) {
-                            Text(stringResource(R.string.done), color = IndigoAccent, fontWeight = FontWeight.Bold)
+                    error != null && allApps.isEmpty() -> {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                            InlineNotice(
+                                title = stringResource(R.string.error_reading_apps),
+                                body = error,
+                                tone = NoticeTone.Error,
+                                actionLabel = stringResource(R.string.try_again),
+                                onAction = onRetry
+                            )
                         }
+                    }
+
+                    filteredApps.isEmpty() -> {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            EmptyState(
+                                title = stringResource(R.string.no_apps_found),
+                                body = stringResource(R.string.no_apps_found_body)
+                            )
+                        }
+                    }
+
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(0.dp)
+                        ) {
+                            items(filteredApps, key = { it.packageName }) { app ->
+                                AppPickerRow(
+                                    app = app,
+                                    selected = app.packageName in selectedApps,
+                                    onToggle = { onToggleApp(app.packageName) }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = colors.hairline)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = pluralStringResource(
+                            R.plurals.selected_apps_count,
+                            selectedApps.size,
+                            selectedApps.size
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.inkMuted,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Button(
+                        onClick = onDismiss,
+                        shape = RelayShapes.small,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colors.ink,
+                            contentColor = colors.background
+                        ),
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.done),
+                            style = MaterialTheme.typography.labelLarge
+                        )
                     }
                 }
             }
         }
-    )
+    }
+}
+
+@Composable
+private fun AppPickerRow(
+    app: AppInfoItem,
+    selected: Boolean,
+    onToggle: () -> Unit
+) {
+    val colors = RelayTheme.colors
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clip(RelayShapes.small)
+            .background(if (selected) colors.surfaceRaised else Color.Transparent)
+            .toggleable(
+                value = selected,
+                role = Role.Checkbox,
+                onValueChange = { onToggle() }
+            )
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AppIcon(
+            packageName = app.packageName,
+            label = app.name,
+            size = 32.dp
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = app.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = app.packageName,
+                style = RelayMonoSmall,
+                color = colors.inkMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Checkbox(
+            checked = selected,
+            onCheckedChange = null,
+            colors = CheckboxDefaults.colors(
+                checkedColor = colors.ink,
+                checkmarkColor = colors.background,
+                uncheckedColor = colors.hairline
+            )
+        )
+    }
 }

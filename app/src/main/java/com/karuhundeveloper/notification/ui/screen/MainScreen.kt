@@ -11,40 +11,75 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.NotificationsOff
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -53,23 +88,32 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.karuhundeveloper.notification.R
 import com.karuhundeveloper.notification.data.local.entity.InterceptRule
 import com.karuhundeveloper.notification.service.AppNotificationListener
-import com.karuhundeveloper.notification.ui.component.MethodBadge
-import com.karuhundeveloper.notification.ui.theme.*
+import com.karuhundeveloper.notification.ui.component.AppTag
+import com.karuhundeveloper.notification.ui.component.EmptyState
+import com.karuhundeveloper.notification.ui.component.InlineNotice
+import com.karuhundeveloper.notification.ui.component.LoadingBlock
+import com.karuhundeveloper.notification.ui.component.MethodLabel
+import com.karuhundeveloper.notification.ui.component.NoticeTone
+import com.karuhundeveloper.notification.ui.component.RelayTag
+import com.karuhundeveloper.notification.ui.component.ScreenHeader
+import com.karuhundeveloper.notification.ui.component.SectionLabel
+import com.karuhundeveloper.notification.ui.component.StatusLine
+import com.karuhundeveloper.notification.ui.theme.RelayMono
+import com.karuhundeveloper.notification.ui.theme.RelayMonoSmall
+import com.karuhundeveloper.notification.ui.theme.RelayShapes
+import com.karuhundeveloper.notification.ui.theme.RelayTheme
+import com.karuhundeveloper.notification.ui.viewmodel.RulesUiState
 import com.karuhundeveloper.notification.ui.viewmodel.RulesViewModel
 import com.karuhundeveloper.notification.util.ServiceUtils
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-private const val DUMMY_CHANNEL_ID   = "dummy_test_channel"
+private const val DUMMY_CHANNEL_ID = "dummy_test_channel"
 private const val DUMMY_NOTIFICATION_ID = 9_001
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper: check Notification Listener access
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Returns true if this app currently has Notification Listener permission granted.
- * Uses the enabled-listener flat list rather than [AppOpsManager] for compatibility
- * down to API 24.
+ * Uses the enabled-listener flat list rather than AppOpsManager for compatibility down to API 24.
  */
 fun isNotificationListenerEnabled(context: Context): Boolean {
     val flat = Settings.Secure.getString(
@@ -87,14 +131,10 @@ fun isIgnoringBatteryOptimizations(context: Context): Boolean {
     return powerManager.isIgnoringBatteryOptimizations(context.packageName)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper: post dummy notification
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Creates the required [NotificationChannel] (idempotent on repeated calls) then posts
- * a test notification whose package name appears to come from this app — the
- * [AppNotificationListener] will receive it exactly like any real notification.
+ * Creates the test notification channel and posts a notification from this app.
+ * The listener receives it like any other notification, so a rule targeting this
+ * package can exercise the whole delivery path.
  */
 fun postDummyNotification(context: Context) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -102,15 +142,16 @@ fun postDummyNotification(context: Context) {
         PackageManager.PERMISSION_GRANTED
     ) return
 
-    // Create channel (required API 26+, no-op on lower)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         val channel = NotificationChannel(
             DUMMY_CHANNEL_ID,
             context.getString(R.string.test_notification_channel),
             NotificationManager.IMPORTANCE_DEFAULT
-        ).apply { description = context.getString(R.string.test_notification_channel_description) }
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(channel)
+        ).apply {
+            description = context.getString(R.string.test_notification_channel_description)
+        }
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(channel)
     }
 
     val notification = NotificationCompat.Builder(context, DUMMY_CHANNEL_ID)
@@ -121,14 +162,8 @@ fun postDummyNotification(context: Context) {
         .setAutoCancel(true)
         .build()
 
-    // The listener service sees this app's package name as the source;
-    // add a rule with targetApp = context.packageName to intercept it.
     NotificationManagerCompat.from(context).notify(DUMMY_NOTIFICATION_ID, notification)
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Screen
-// ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -138,14 +173,19 @@ fun MainScreen(
     viewModel: RulesViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val rules by viewModel.rules.collectAsStateWithLifecycle()
+    val colors = RelayTheme.colors
+    val rulesState by viewModel.rules.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val testSentMessage = stringResource(R.string.test_sent)
 
     var listenerEnabled by remember { mutableStateOf(isNotificationListenerEnabled(context)) }
     val serviceConnected by AppNotificationListener.isConnected.collectAsStateWithLifecycle()
-    var ignoringBatteryOptimizations by remember { mutableStateOf(isIgnoringBatteryOptimizations(context)) }
+    var ignoringBatteryOptimizations by remember {
+        mutableStateOf(isIgnoringBatteryOptimizations(context))
+    }
     var isRepairing by remember { mutableStateOf(false) }
 
-    // Re-check listener permission and battery optimization every time the screen comes back to foreground.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -153,8 +193,6 @@ fun MainScreen(
                 listenerEnabled = isNotificationListenerEnabled(context)
                 ignoringBatteryOptimizations = isIgnoringBatteryOptimizations(context)
 
-                // If permission is granted but service is NOT connected, try a quick toggle
-                // to kickstart the system binding.
                 if (listenerEnabled && !serviceConnected && !isRepairing) {
                     ServiceUtils.toggleNotificationListenerService(context)
                 }
@@ -164,351 +202,338 @@ fun MainScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Auto-reset repairing state when service connects
     LaunchedEffect(serviceConnected) {
-        if (serviceConnected) {
-            isRepairing = false
-        }
+        if (serviceConnected) isRepairing = false
     }
 
-    // Manual polling if repair is active but system is slow to report
     LaunchedEffect(isRepairing) {
         if (isRepairing) {
-            // Keep checking every second for 10 seconds or until connected
             repeat(10) {
                 if (AppNotificationListener.isConnected.value) {
                     isRepairing = false
                     return@repeat
                 }
-                delay(1000)
+                delay(1_000)
             }
             isRepairing = false
         }
     }
 
-    // Runtime permission launcher for POST_NOTIFICATIONS (Android 13+)
-    var notifyPermGranted by remember {
+    var notifyPermissionGranted by remember {
         mutableStateOf(
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-                        PackageManager.PERMISSION_GRANTED
-            else true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
         )
     }
-    val permLauncher = rememberLauncherForActivityResult(
+    val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted -> notifyPermGranted = granted }
+    ) { granted -> notifyPermissionGranted = granted }
 
     var showDeleteDialog by remember { mutableStateOf<InterceptRule?>(null) }
-    var showLanguageDialog by remember { mutableStateOf(false) }
+    var showLanguageSheet by remember { mutableStateOf(false) }
 
     Scaffold(
-        containerColor = NavyDeep,
-        topBar = { MainTopBar(onLanguageClick = { showLanguageDialog = true }) },
+        containerColor = colors.background,
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = colors.ink,
+                    contentColor = colors.background,
+                    shape = RelayShapes.small
+                )
+            }
+        },
+        topBar = {
+            ScreenHeader(
+                title = stringResource(R.string.app_name),
+                subtitle = stringResource(R.string.main_subtitle),
+                actions = {
+                    IconButton(onClick = { showLanguageSheet = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = stringResource(R.string.language),
+                            tint = colors.ink
+                        )
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onAddRuleClick,
-                containerColor = IndigoAccent,
-                contentColor = Color.White,
-                icon = { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_rule)) },
-                text = { Text(stringResource(R.string.add_rule), fontWeight = FontWeight.SemiBold) }
+                containerColor = colors.ink,
+                contentColor = colors.background,
+                shape = RelayShapes.small,
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = {
+                    Text(
+                        text = stringResource(R.string.add_rule),
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
             )
         }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp)
+                .padding(padding),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = 4.dp,
+                bottom = 104.dp
+            )
         ) {
-            // ── Listener permission / Stalled service banner ──────────────────
-            item {
-                AnimatedVisibility(
-                    visible = !listenerEnabled || !serviceConnected || !ignoringBatteryOptimizations,
-                    enter = fadeIn() + slideInVertically(),
-                    exit = fadeOut(tween(200))
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (!listenerEnabled) {
-                            ListenerPermissionBanner {
-                                context.startActivity(
-                                    Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                )
-                            }
-                        } else if (!serviceConnected) {
-                            ServiceStalledBanner(isRepairing = isRepairing) {
-                                isRepairing = true
-                                ServiceUtils.toggleNotificationListenerService(context)
-                            }
-                        }
-
-                        if (listenerEnabled && !ignoringBatteryOptimizations) {
-                            BatteryOptimizationBanner {
-                                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                                context.startActivity(intent)
-                            }
-                        }
+            item(key = "status") {
+                StatusBlock(
+                    listenerEnabled = listenerEnabled,
+                    serviceConnected = serviceConnected,
+                    batteryOptimized = ignoringBatteryOptimizations,
+                    isRepairing = isRepairing,
+                    onGrant = {
+                        context.startActivity(
+                            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    },
+                    onRepair = {
+                        isRepairing = true
+                        ServiceUtils.toggleNotificationListenerService(context)
+                    },
+                    onBatterySettings = {
+                        context.startActivity(
+                            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                        )
                     }
-                }
+                )
             }
 
-            // ── Test button card ──────────────────────────────────────────────
-            item {
-                TestNotificationCard(
-                    permissionGranted = notifyPermGranted,
+            item(key = "test") {
+                Spacer(Modifier.height(12.dp))
+                TestNotificationRow(
+                    permissionGranted = notifyPermissionGranted,
                     onRequestPermission = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            permLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
                     },
-                    onSendDummy = { postDummyNotification(context) }
+                    onSend = {
+                        postDummyNotification(context)
+                        scope.launch { snackbarHostState.showSnackbar(testSentMessage) }
+                    }
                 )
             }
 
-            // ── Section header ────────────────────────────────────────────────
-            item {
-                SectionHeader(
-                    title = stringResource(R.string.intercept_rules),
-                    count = rules.size
+            item(key = "rules-header") {
+                Spacer(Modifier.height(28.dp))
+                SectionLabel(
+                    text = stringResource(R.string.rules),
+                    trailing = (rulesState as? RulesUiState.Ready)?.rules?.size?.toString()
                 )
             }
 
-            // ── Rules list ────────────────────────────────────────────────────
-            if (rules.isEmpty()) {
-                item { EmptyRulesPlaceholder() }
-            } else {
-                items(rules, key = { it.id }) { rule ->
-                    RuleCard(
-                        rule = rule,
-                        onDeleteClick = { showDeleteDialog = rule },
-                        onHistoryClick = { onRuleClick(rule) }
+            when (val state = rulesState) {
+                RulesUiState.Loading -> item(key = "rules-loading") {
+                    LoadingBlock(
+                        label = stringResource(R.string.loading_rules),
+                        modifier = Modifier.padding(top = 8.dp)
                     )
+                }
+
+                is RulesUiState.Failed -> item(key = "rules-error") {
+                    Spacer(Modifier.height(12.dp))
+                    InlineNotice(
+                        title = stringResource(R.string.error_reading_rules),
+                        body = state.detail ?: stringResource(R.string.error_unknown),
+                        tone = NoticeTone.Error,
+                        actionLabel = stringResource(R.string.try_again),
+                        onAction = viewModel::reload
+                    )
+                }
+
+                is RulesUiState.Ready -> {
+                    if (state.rules.isEmpty()) {
+                        item(key = "rules-empty") {
+                            EmptyState(
+                                title = stringResource(R.string.no_rules_yet),
+                                body = stringResource(R.string.no_rules_message),
+                                actionLabel = stringResource(R.string.create_first_rule),
+                                onAction = onAddRuleClick
+                            )
+                        }
+                    } else {
+                        items(state.rules, key = { it.id }) { rule ->
+                            RouteRow(
+                                rule = rule,
+                                onHistoryClick = { onRuleClick(rule) },
+                                onDeleteClick = { showDeleteDialog = rule }
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 
-    // ── Delete confirmation dialog ────────────────────────────────────────────
     showDeleteDialog?.let { rule ->
         AlertDialog(
             onDismissRequest = { showDeleteDialog = null },
-            containerColor = NavyCard,
-            icon = { Icon(Icons.Default.DeleteForever, tint = ErrorRed, contentDescription = null) },
-            title = { Text(stringResource(R.string.delete_rule), color = TextPrimary) },
-            text = { Text(stringResource(R.string.delete_rule_confirmation, rule.ruleName), color = TextSecondary) },
+            containerColor = colors.surface,
+            shape = RelayShapes.medium,
+            title = {
+                Text(
+                    text = stringResource(R.string.delete_rule),
+                    color = colors.ink
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.delete_rule_confirmation, rule.ruleName),
+                    color = colors.inkMuted
+                )
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    viewModel.deleteRule(rule)
-                    showDeleteDialog = null
-                }) { Text(stringResource(R.string.delete), color = ErrorRed, fontWeight = FontWeight.Bold) }
+                TextButton(
+                    onClick = {
+                        viewModel.deleteRule(rule)
+                        showDeleteDialog = null
+                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.delete),
+                        color = colors.error,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = null }) {
-                    Text(stringResource(R.string.cancel), color = TextSecondary)
+                    Text(
+                        text = stringResource(R.string.cancel),
+                        color = colors.inkMuted,
+                        style = MaterialTheme.typography.labelLarge
+                    )
                 }
             }
         )
     }
 
-    if (showLanguageDialog) {
+    if (showLanguageSheet) {
         val appLocales = AppCompatDelegate.getApplicationLocales()
         val selectedLanguage = if (appLocales.isEmpty) "" else appLocales[0]?.language.orEmpty()
-        AlertDialog(
-            onDismissRequest = { showLanguageDialog = false },
-            containerColor = NavyCard,
-            title = { Text(stringResource(R.string.app_language), color = TextPrimary) },
-            text = {
-                Column {
-                    listOf(
-                        "" to R.string.follow_system,
-                        "id" to R.string.language_indonesian,
-                        "en" to R.string.language_english
-                    ).forEach { (tag, label) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    showLanguageDialog = false
-                                    AppCompatDelegate.setApplicationLocales(
-                                        LocaleListCompat.forLanguageTags(tag)
-                                    )
-                                }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(selected = selectedLanguage == tag, onClick = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(label), color = TextPrimary)
+
+        ModalBottomSheet(
+            onDismissRequest = { showLanguageSheet = false },
+            containerColor = colors.surface,
+            contentColor = colors.ink
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 28.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.app_language),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.ink
+                )
+                Spacer(Modifier.height(10.dp))
+                listOf(
+                    "" to R.string.follow_system,
+                    "id" to R.string.language_indonesian,
+                    "en" to R.string.language_english
+                ).forEach { (tag, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .clip(RelayShapes.small)
+                            .clickable {
+                                showLanguageSheet = false
+                                AppCompatDelegate.setApplicationLocales(
+                                    LocaleListCompat.forLanguageTags(tag)
+                                )
+                            }
+                            .padding(horizontal = 4.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(label),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = colors.ink,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (selectedLanguage == tag) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = colors.ink
+                            )
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showLanguageDialog = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            }
-        )
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-components
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MainTopBar(onLanguageClick: () -> Unit) {
-    TopAppBar(
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(listOf(IndigoAccent, CyanAccent))
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.Notifications,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.app_name),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = TextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        stringResource(R.string.main_subtitle),
-                        fontSize = 11.sp,
-                        color = TextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        },
-        actions = {
-            IconButton(onClick = onLanguageClick) {
-                Icon(Icons.Default.Language, contentDescription = stringResource(R.string.language), tint = TextPrimary)
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = NavyDeep)
-    )
-}
-
-@Composable
-private fun BatteryOptimizationBanner(onOpenSettings: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = NavyElevated),
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(CyanAccent.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.BatteryAlert, tint = CyanAccent, contentDescription = null)
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.battery_optimization),
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    fontSize = 13.sp
-                )
-                Text(
-                    stringResource(R.string.battery_optimization_message),
-                    color = TextSecondary,
-                    fontSize = 12.sp
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            TextButton(
-                onClick = onOpenSettings,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-            ) {
-                Text(stringResource(R.string.settings), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CyanAccent)
             }
         }
     }
 }
 
 @Composable
-private fun ServiceStalledBanner(isRepairing: Boolean, onRepair: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF3B2D1A)), // Dark Amber
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFFFA000).copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    if (isRepairing) Icons.Default.Sync else Icons.Default.SyncProblem,
-                    tint = Color(0xFFFFA000),
-                    contentDescription = null
+private fun StatusBlock(
+    listenerEnabled: Boolean,
+    serviceConnected: Boolean,
+    batteryOptimized: Boolean,
+    isRepairing: Boolean,
+    onGrant: () -> Unit,
+    onRepair: () -> Unit,
+    onBatterySettings: () -> Unit
+) {
+    Column {
+        if (listenerEnabled && serviceConnected && batteryOptimized) {
+            StatusLine(
+                title = stringResource(R.string.relay_active),
+                detail = stringResource(R.string.relay_active_detail),
+                live = true
+            )
+        } else {
+            if (!listenerEnabled) {
+                InlineNotice(
+                    title = stringResource(R.string.listener_access_required),
+                    body = stringResource(R.string.listener_permission_message),
+                    tone = NoticeTone.Error,
+                    actionLabel = stringResource(R.string.grant),
+                    onAction = onGrant
+                )
+            } else if (!serviceConnected) {
+                InlineNotice(
+                    title = stringResource(
+                        if (isRepairing) R.string.repairing_listener else R.string.service_stalled
+                    ),
+                    body = stringResource(
+                        if (isRepairing) R.string.waiting_for_rebind else R.string.service_stalled_message
+                    ),
+                    tone = NoticeTone.Warning,
+                    actionLabel = if (isRepairing) null else stringResource(R.string.repair),
+                    onAction = if (isRepairing) null else onRepair
                 )
             }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    stringResource(if (isRepairing) R.string.repairing_listener else R.string.service_stalled),
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    fontSize = 13.sp
-                )
-                Text(
-                    stringResource(if (isRepairing) R.string.waiting_for_rebind else R.string.service_stalled_message),
-                    color = TextSecondary,
-                    fontSize = 12.sp
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Button(
-                onClick = onRepair,
-                enabled = !isRepairing,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFFA000),
-                    disabledContainerColor = Color(0xFFFFA000).copy(alpha = 0.5f)
-                ),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text(
-                    stringResource(if (isRepairing) R.string.repairing_button else R.string.repair),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black
+
+            if (listenerEnabled && !batteryOptimized) {
+                Spacer(Modifier.height(8.dp))
+                InlineNotice(
+                    title = stringResource(R.string.battery_optimization),
+                    body = stringResource(R.string.battery_optimization_message),
+                    tone = NoticeTone.Warning,
+                    actionLabel = stringResource(R.string.settings),
+                    onAction = onBatterySettings
                 )
             }
         }
@@ -516,114 +541,67 @@ private fun ServiceStalledBanner(isRepairing: Boolean, onRepair: () -> Unit) {
 }
 
 @Composable
-private fun ListenerPermissionBanner(onOpenSettings: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF3B1A1A)),
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(ErrorRed.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Outlined.NotificationsOff, tint = ErrorRed, contentDescription = null)
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.listener_access_required),
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    fontSize = 13.sp
-                )
-                Text(
-                    stringResource(R.string.listener_permission_message),
-                    color = TextSecondary,
-                    fontSize = 12.sp
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Button(
-                onClick = onOpenSettings,
-                colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text(stringResource(R.string.grant), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
-private fun TestNotificationCard(
+private fun TestNotificationRow(
     permissionGranted: Boolean,
     onRequestPermission: () -> Unit,
-    onSendDummy: () -> Unit
+    onSend: () -> Unit
 ) {
-    Card(
+    val colors = RelayTheme.colors
+
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = NavyCard),
+        shape = RelayShapes.medium,
+        color = colors.surface,
+        border = BorderStroke(1.dp, colors.hairline)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(Modifier.weight(1f)) {
                 Text(
-                    stringResource(R.string.test_pipeline),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = TextPrimary
+                    text = stringResource(R.string.test_notification),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = colors.ink
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    stringResource(R.string.test_pipeline_message, LocalContext.current.packageName),
-                    fontSize = 11.sp,
-                    color = TextSecondary,
-                    lineHeight = 16.sp
+                    text = stringResource(
+                        R.string.test_notification_help,
+                        LocalContext.current.packageName
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.inkMuted
                 )
             }
             Spacer(Modifier.width(12.dp))
-            if (!permissionGranted) {
-                OutlinedButton(
-                    onClick = onRequestPermission,
-                    shape = RoundedCornerShape(10.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CyanAccent),
+            if (permissionGranted) {
+                Button(
+                    onClick = onSend,
+                    shape = RelayShapes.small,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.ink,
+                        contentColor = colors.background
+                    ),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    Text(stringResource(R.string.allow), color = CyanAccent, fontSize = 12.sp)
+                    Text(
+                        text = stringResource(R.string.send_test),
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
             } else {
-                Button(
-                    onClick = onSendDummy,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Transparent
-                    ),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            Brush.linearGradient(listOf(IndigoAccent, CyanAccent))
-                        ),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    elevation = ButtonDefaults.buttonElevation(0.dp)
+                OutlinedButton(
+                    onClick = onRequestPermission,
+                    shape = RelayShapes.small,
+                    border = BorderStroke(1.dp, colors.hairline),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Send,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                    Text(
+                        text = stringResource(R.string.allow_notifications),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.ink
                     )
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.send_dummy), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -631,173 +609,174 @@ private fun TestNotificationCard(
 }
 
 @Composable
-private fun SectionHeader(title: String, count: Int) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            title,
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
-            color = TextPrimary,
-            modifier = Modifier.weight(1f)
-        )
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = IndigoAccent.copy(alpha = 0.2f)
-        ) {
-            Text(
-                count.toString(),
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = IndigoLight
-            )
-        }
-    }
-}
-
-@Composable
-private fun RuleCard(
+private fun RouteRow(
     rule: InterceptRule,
-    onDeleteClick: () -> Unit,
-    onHistoryClick: () -> Unit
+    onHistoryClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    val colors = RelayTheme.colors
+    var expanded by rememberSaveable(rule.id) { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = NavyCard),
-        onClick = { expanded = !expanded }
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // ── Header row ────────────────────────────────────────────────────
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Method badge
-                MethodBadge(method = rule.apiMethod)
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        rule.ruleName,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        color = TextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        rule.apiUrl,
-                        fontSize = 11.sp,
-                        color = TextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                IconButton(onClick = onHistoryClick) {
-                    Icon(Icons.Default.History, tint = IndigoLight, contentDescription = stringResource(R.string.history))
-                }
-                IconButton(onClick = onDeleteClick) {
-                    Icon(Icons.Default.Delete, tint = ErrorRed.copy(alpha = 0.7f), contentDescription = stringResource(R.string.delete))
-                }
-            }
-
-            // ── Expandable detail section ─────────────────────────────────────
-            AnimatedVisibility(visible = expanded) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    HorizontalDivider(color = Divider)
-                    Spacer(Modifier.height(10.dp))
-
-                    DetailRow(label = stringResource(R.string.target_apps), value = rule.targetApps.joinToString(", "))
-
-                    if (rule.customHeaders.isNotEmpty()) {
-                        Spacer(Modifier.height(6.dp))
-                        DetailRow(
-                            label = stringResource(R.string.headers),
-                            value = rule.customHeaders.entries.joinToString("\n") { "${it.key}: ${it.value}" }
-                        )
-                    }
-                }
-            }
-
-            // ── App chips ─────────────────────────────────────────────────────
-            if (rule.targetApps.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    rule.targetApps.take(3).forEach { pkg ->
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = NavyElevated,
-                            modifier = Modifier.border(1.dp, Divider, RoundedCornerShape(20.dp))
-                        ) {
-                            Text(
-                                pkg.substringAfterLast('.'),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                fontSize = 10.sp,
-                                color = TextSecondary
-                            )
-                        }
-                    }
-                    if (rule.targetApps.size > 3) {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = IndigoAccent.copy(alpha = 0.15f)
-                        ) {
-                            Text(
-                                stringResource(R.string.more_apps_count, rule.targetApps.size - 3),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                fontSize = 10.sp,
-                                color = IndigoLight
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-
-@Composable
-private fun DetailRow(label: String, value: String) {
-    Column {
-        Text(label, fontSize = 10.sp, color = IndigoLight, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp)
-        Spacer(Modifier.height(2.dp))
-        Text(value, fontSize = 12.sp, color = TextSecondary, lineHeight = 17.sp)
-    }
-}
-
-@Composable
-private fun EmptyRulesPlaceholder() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .clickable { expanded = !expanded }
     ) {
-        Box(
-            modifier = Modifier
-                .size(80.dp)
-                .clip(CircleShape)
-                .background(NavyCard),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.padding(top = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.Rule,
-                contentDescription = null,
-                tint = IndigoAccent.copy(alpha = 0.5f),
-                modifier = Modifier.size(40.dp)
+            Text(
+                text = rule.ruleName,
+                style = MaterialTheme.typography.titleSmall,
+                color = colors.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            if (rule.autoRetry) {
+                RelayTag(text = stringResource(R.string.auto_retry_short))
+                Spacer(Modifier.width(4.dp))
+            }
+            Box {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.more_actions),
+                        tint = colors.inkMuted
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    containerColor = colors.surface
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = stringResource(R.string.delete),
+                                color = colors.error,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                tint = colors.error
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onDeleteClick()
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MethodLabel(method = rule.apiMethod)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = rule.apiUrl,
+                style = RelayMono,
+                color = colors.inkMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
         }
-        Spacer(Modifier.height(16.dp))
-        Text(stringResource(R.string.no_rules_yet), fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
-        Spacer(Modifier.height(6.dp))
+
+        Spacer(Modifier.height(10.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                rule.targetApps.take(2).forEach { packageName ->
+                    AppTag(packageName = packageName)
+                }
+                if (rule.targetApps.size > 2) {
+                    RelayTag(
+                        text = stringResource(
+                            R.string.more_apps_count,
+                            rule.targetApps.size - 2
+                        )
+                    )
+                }
+            }
+            TextButton(
+                onClick = onHistoryClick,
+                contentPadding = PaddingValues(horizontal = 8.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.history),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.ink
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Column(Modifier.padding(top = 10.dp)) {
+                HorizontalDivider(color = colors.hairline)
+                Spacer(Modifier.height(10.dp))
+                DetailLine(
+                    label = stringResource(R.string.target_apps),
+                    value = rule.targetApps.joinToString("\n")
+                )
+                if (rule.customHeaders.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    DetailLine(
+                        label = stringResource(R.string.headers),
+                        value = rule.customHeaders.entries.joinToString("\n") {
+                            "${it.key}: ${it.value}"
+                        }
+                    )
+                }
+                if (rule.autoRetry) {
+                    Spacer(Modifier.height(10.dp))
+                    DetailLine(
+                        label = stringResource(R.string.delivery),
+                        value = stringResource(R.string.automatic_retry_on)
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        HorizontalDivider(color = colors.hairline)
+    }
+}
+
+@Composable
+private fun DetailLine(label: String, value: String) {
+    val colors = RelayTheme.colors
+
+    Column {
         Text(
-            stringResource(R.string.no_rules_message),
-            color = TextSecondary,
-            fontSize = 13.sp
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.inkMuted
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = value,
+            style = RelayMonoSmall,
+            color = colors.ink
         )
     }
 }

@@ -19,8 +19,8 @@ class LocalizationTest {
         val indonesian = contextFor("id")
         val chinese = contextFor("zh")
 
-        assertEquals("Add Rule", english.getString(R.string.add_rule))
-        assertEquals("Tambah Aturan", indonesian.getString(R.string.add_rule))
+        assertEquals("Add rule", english.getString(R.string.add_rule))
+        assertEquals("Tambah aturan", indonesian.getString(R.string.add_rule))
         assertEquals(english.getString(R.string.add_rule), chinese.getString(R.string.add_rule))
         assertEquals(
             "Hapus \"Demo\"? Tindakan ini tidak dapat dibatalkan.",
